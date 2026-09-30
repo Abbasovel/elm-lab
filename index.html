@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Elm Laboratoriyası</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E1826">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -192,7 +196,9 @@ function renderHome(){
     const u=document.createElement("span"); u.className="row-unit"; u.textContent=ex.unit;
     const d=document.createElement("span"); d.className="row-desc"; d.textContent=ex.desc.split(". ")[0]+".";
     b.append(t,u,d);
-    if(!available(ex.src)){ const n=document.createElement("span"); n.className="row-note"; n.textContent="Bu brauzerdə əlçatan deyil"; b.appendChild(n); }
+    if(!available(ex.src)){ const n=document.createElement("span"); n.className="row-note";
+      n.textContent = ex.src==="magnetometer" ? "Bu brauzerdə bağlıdır. Chrome: chrome://flags → Generic Sensor Extra Classes → Enabled" : "Bu brauzerdə əlçatan deyil";
+      b.appendChild(n); }
     b.addEventListener("click",()=>openExp(ex));
     box.appendChild(b);
   });
@@ -545,6 +551,9 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw
 document.addEventListener("visibilitychange",()=>{ if(document.hidden && running) stop("Səhifə arxa plana keçdi, ölçmə dayandırıldı."); });
 
 renderHome();
+if("serviceWorker" in navigator && location.protocol==="https:" && /github\.io$|elmmuzeyi/i.test(location.hostname)){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
 })();
 </script>
 </body>
