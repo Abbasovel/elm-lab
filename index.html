@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Elm Laboratoriyası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E9F0F5; --surface:#F7FAFC; --ink:#14243B; --muted:#56657A; --line:#C4D2DE;
+  --grid-minor:#DDE7EF; --grid-major:#B7C9D8; --accent:#1F5FBF; --bad:#B3261E;
+  --cx:#C8322B; --cy:#23864F; --cz:#2463C9; --cm:#14243B;
+  --btn:#14243B; --btn-ink:#FFFFFF; --stop:#B3261E;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1826; --surface:#142233; --ink:#E6EDF5; --muted:#9AAABD; --line:#2A3B52;
+    --grid-minor:#1A293B; --grid-major:#2B3F58; --accent:#7AAAF2; --bad:#F08A80;
+    --cx:#FF7B6F; --cy:#5CC58D; --cz:#7AAAFF; --cm:#E6EDF5;
+    --btn:#E6EDF5; --btn-ink:#0E1826; --stop:#C8372D;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1826; --surface:#142233; --ink:#E6EDF5; --muted:#9AAABD; --line:#2A3B52;
+  --grid-minor:#1A293B; --grid-major:#2B3F58; --accent:#7AAAF2; --bad:#F08A80;
+  --cx:#FF7B6F; --cy:#5CC58D; --cz:#7AAAFF; --cm:#E6EDF5;
+  --btn:#E6EDF5; --btn-ink:#0E1826; --stop:#C8372D;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,select{font:inherit;color:inherit}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.screen{max-width:760px;margin:0 auto;padding:20px 18px 32px}
+[hidden]{display:none!important}
+
+/* Home */
+.brand{padding:18px 0 22px;border-bottom:2px solid var(--ink);margin-bottom:8px}
+.brand h1{font-family:var(--cond);font-weight:700;font-size:clamp(2.1rem,9vw,3.4rem);line-height:1;letter-spacing:-.01em;margin:0 0 10px}
+.brand p{margin:0;color:var(--muted);max-width:52ch}
+.group h3{font-size:.95rem;font-weight:600;color:var(--muted);margin:24px 0 4px}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 14px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:14px 2px;cursor:pointer}
+.row:hover .row-title{color:var(--accent)}
+.row-title{font-weight:600;font-size:1.08rem}
+.row-unit{grid-row:1/3;grid-column:2;align-self:center;font-family:var(--cond);font-weight:600;color:var(--muted)}
+.row-desc{color:var(--muted);font-size:.9rem}
+.row-note{grid-column:1/-1;font-size:.82rem;color:var(--bad)}
+.foot{margin-top:28px;color:var(--muted);font-size:.85rem;max-width:60ch}
+
+/* Experiment */
+.bar{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:2px solid var(--ink)}
+.back{background:none;border:0;padding:6px 0;color:var(--accent);cursor:pointer;font-weight:500}
+.bar h2{font-family:var(--cond);font-weight:700;font-size:clamp(1.6rem,6.5vw,2.3rem);line-height:1.05;margin:0;flex-basis:100%}
+.desc{color:var(--muted);margin:10px 0 14px;max-width:60ch;font-size:.95rem}
+.values{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px 16px;margin-bottom:12px}
+.val{border-left:4px solid var(--c);padding:2px 0 2px 10px}
+.val.off{opacity:.4}
+.val-l{font-size:.82rem;color:var(--muted)}
+.val-n{font-family:var(--cond);font-weight:600;font-size:1.75rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.val-u{font-size:.85rem;color:var(--muted);margin-left:4px;font-family:var(--font);font-weight:400}
+.extra{font-size:.9rem;color:var(--muted);margin:-4px 0 10px;font-variant-numeric:tabular-nums}
+.plot{position:relative;height:clamp(240px,46vh,440px);border:1px solid var(--line);background:var(--surface)}
+.plot canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px 4px 8px;cursor:pointer;font-size:.9rem}
+.chip i{width:14px;height:3px;background:var(--c);display:inline-block;border-radius:2px}
+.chip[aria-pressed="false"]{opacity:.45}
+.seg{display:inline-flex;border:1px solid var(--line);margin:0 0 10px}
+.seg button{background:var(--surface);border:0;padding:6px 14px;cursor:pointer;font-size:.9rem}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.status{min-height:1.5em;font-size:.92rem;color:var(--muted);margin:6px 0 10px}
+.status.err{color:var(--bad)}
+.controls{display:flex;gap:10px;flex-wrap:wrap}
+.controls button{border:1px solid var(--ink);background:transparent;padding:12px 18px;cursor:pointer;font-weight:500}
+.controls .primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn);min-width:9.5em;font-weight:600}
+.controls .primary.stop{background:var(--stop);border-color:var(--stop);color:#fff}
+.settings{display:flex;gap:10px 18px;flex-wrap:wrap;margin-top:16px;font-size:.9rem;color:var(--muted)}
+.settings label{display:flex;align-items:center;gap:8px}
+.settings select{background:var(--surface);border:1px solid var(--line);padding:6px 8px;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<main id="home" class="screen">
+  <header class="brand">
+    <h1>Elm Laboratoriyası</h1>
+    <p>Telefonun sensorları ilə fizika təcrübələri. Ölç, qrafikə bax, nəticəni CSV faylı kimi saxla.</p>
+  </header>
+  <div id="list"></div>
+  <p class="foot">Elçin Abbasovun İnteraktiv Elm Muzeyi. Səs səviyyəsi kalibrlənməyib, nisbi ölçü kimi istifadə edin. Maqnitometr və işıq sensoru brauzerlərin çoxunda bağlıdır.</p>
+</main>
+
+<section id="exp" class="screen" hidden>
+  <div class="bar">
+    <button class="back" id="back">‹ Təcrübələr</button>
+    <h2 id="title"></h2>
+  </div>
+  <p class="desc" id="desc"></p>
+  <div class="values" id="values"></div>
+  <div class="extra" id="extra" hidden></div>
+  <div class="seg" id="specSeg" hidden>
+    <button data-v="spectrum" aria-pressed="true">Spektr</button>
+    <button data-v="history" aria-pressed="false">Pik tezlik zamanla</button>
+  </div>
+  <div class="plot"><canvas id="cv" aria-label="Ölçmə qrafiki"></canvas></div>
+  <div class="legend" id="legend"></div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div class="controls">
+    <button class="primary" id="run">Başla</button>
+    <button id="clear">Sıfırla</button>
+    <button id="csv">CSV saxla</button>
+  </div>
+  <div class="settings">
+    <label>Gecikmə
+      <select id="delay"><option value="0">yoxdur</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option></select>
+    </label>
+    <label>Müddət
+      <select id="dur"><option value="0">limitsiz</option><option value="5">5 s</option><option value="10">10 s</option><option value="30">30 s</option><option value="60">60 s</option></select>
+    </label>
+    <label>Qrafik pəncərəsi
+      <select id="win"><option value="5">5 s</option><option value="10" selected>10 s</option><option value="30">30 s</option><option value="0">hamısı</option></select>
+    </label>
+  </div>
+</section>
+
+<script>
+(function(){
+"use strict";
+const $ = s => document.querySelector(s);
+const C = (k,label,unit,col,on=true) => ({k,label,unit,col,on,def:on});
+const DEG = Math.PI/180;
+
+const EXPS = [
+  {group:"Hərəkət", id:"acc", title:"Təcil (g ilə)", unit:"m/s²", src:"motion",
+   desc:"Ağırlıq qüvvəsi daxil olmaqla tam təcil. Telefon masada üzü yuxarı uzananda z oxu təxminən 9,8 m/s² göstərir.",
+   ch:[C("x","x","m/s²","--cx"),C("y","y","m/s²","--cy"),C("z","z","m/s²","--cz"),C("m","|a|","m/s²","--cm",false)],
+   read:e=>{const a=e.accelerationIncludingGravity; if(!a||a.x==null) return null; return [a.x,a.y,a.z,Math.hypot(a.x,a.y,a.z)];}},
+  {group:"Hərəkət", id:"lin", title:"Xətti təcil (g-siz)", unit:"m/s²", src:"motion",
+   desc:"Ağırlıq qüvvəsi çıxılmış təcil. Liftdə, avtomobildə və ya yellənən telefonda hərəkətin özünü göstərir.",
+   ch:[C("x","x","m/s²","--cx"),C("y","y","m/s²","--cy"),C("z","z","m/s²","--cz"),C("m","|a|","m/s²","--cm",false)],
+   read:e=>{const a=e.acceleration; if(!a||a.x==null) return null; return [a.x,a.y,a.z,Math.hypot(a.x,a.y,a.z)];}},
+  {group:"Hərəkət", id:"gyr", title:"Bucaq sürəti", unit:"rad/s", src:"motion",
+   desc:"Giroskop: telefonun hər ox ətrafında fırlanma sürəti. Fırlanan stul, mərkəzdənqaçma və rəqs təcrübələri üçün.",
+   ch:[C("x","x","rad/s","--cx"),C("y","y","rad/s","--cy"),C("z","z","rad/s","--cz"),C("m","|ω|","rad/s","--cm",false)],
+   read:e=>{const r=e.rotationRate; if(!r||r.alpha==null) return null; const x=r.beta*DEG,y=r.gamma*DEG,z=r.alpha*DEG; return [x,y,z,Math.hypot(x,y,z)];}},
+  {group:"Hərəkət", id:"ori", title:"Meyl bucağı", unit:"°", src:"orientation",
+   desc:"Telefonun üfüqə nəzərən meyli (x və y oxları ətrafında) və z oxu ətrafında dönmə bucağı. Maili müstəvi və rəqqas üçün.",
+   ch:[C("b","x ətrafında","°","--cx"),C("g","y ətrafında","°","--cy"),C("a","z ətrafında","°","--cz",false)],
+   read:e=>e.beta==null?null:[e.beta,e.gamma,e.alpha==null?NaN:e.alpha]},
+  {group:"Sahə", id:"mag", title:"Maqnit sahəsi", unit:"µT", src:"magnetometer",
+   desc:"Maqnitometr: maqnit induksiyası mikrotesla ilə. Maqnit, cərəyanlı naqil və kompas təcrübələri üçün.",
+   ch:[C("x","x","µT","--cx"),C("y","y","µT","--cy"),C("z","z","µT","--cz"),C("m","|B|","µT","--cm",false)]},
+  {group:"Səs", id:"lvl", title:"Səs səviyyəsi", unit:"dBFS", src:"audio",
+   desc:"Mikrofon siqnalının orta kvadratik səviyyəsi, tam şkalaya nəzərən (dBFS). Kalibrlənməyib, müqayisə üçün nisbi ölçüdür.",
+   ch:[C("l","səviyyə","dBFS","--cz")]},
+  {group:"Səs", id:"spec", title:"Səs spektri", unit:"Hz", src:"audio", spectrum:true,
+   desc:"Tezlik spektri və əsas (pik) tezlik. Kamerton, simli alətlər, Doppler effekti və rezonans üçün.",
+   ch:[C("f","pik tezlik","Hz","--cx"),C("p","pik səviyyə","dB","--cz",false)]},
+  {group:"Məkan", id:"gps", title:"Mövqe (GPS)", unit:"m/s", src:"geo",
+   desc:"Sürət, hündürlük və ölçmə dəqiqliyi. Açıq havada daha dəqiqdir; ilk siqnal bir neçə saniyə çəkə bilər.",
+   ch:[C("v","sürət","m/s","--cx"),C("h","hündürlük","m","--cz",false),C("d","dəqiqlik","m","--cy",false)]}
+];
+
+function available(src){
+  switch(src){
+    case "motion": return "DeviceMotionEvent" in window;
+    case "orientation": return "DeviceOrientationEvent" in window;
+    case "magnetometer": return "Magnetometer" in window;
+    case "audio": return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    case "geo": return "geolocation" in navigator;
+  }
+  return false;
+}
+
+/* ---------- Home ---------- */
+function renderHome(){
+  const list = $("#list"); list.innerHTML = "";
+  let g = null, box = null;
+  EXPS.forEach(ex=>{
+    if(ex.group!==g){ g=ex.group; box=document.createElement("section"); box.className="group";
+      const h=document.createElement("h3"); h.textContent=g; box.appendChild(h); list.appendChild(box); }
+    const b=document.createElement("button"); b.className="row";
+    const t=document.createElement("span"); t.className="row-title"; t.textContent=ex.title;
+    const u=document.createElement("span"); u.className="row-unit"; u.textContent=ex.unit;
+    const d=document.createElement("span"); d.className="row-desc"; d.textContent=ex.desc.split(". ")[0]+".";
+    b.append(t,u,d);
+    if(!available(ex.src)){ const n=document.createElement("span"); n.className="row-note"; n.textContent="Bu brauzerdə əlçatan deyil"; b.appendChild(n); }
+    b.addEventListener("click",()=>openExp(ex));
+    box.appendChild(b);
+  });
+}
+
+/* ---------- State ---------- */
+let ex=null, data=null, running=false, t0=0, tOffset=0, rafId=0, countdownTimer=0, watchdog=0;
+let handlers={}, audio=null, mag=null, geoId=null, wake=null;
+let lastVals=null, rateTimes=[], lastSpec=null, specView="spectrum", sampleRate=48000;
+const cv=$("#cv"), statusEl=$("#status"), runBtn=$("#run");
+
+function setStatus(msg,err){ statusEl.textContent=msg||""; statusEl.classList.toggle("err",!!err); }
+function fmt(v){ if(v==null||!isFinite(v)) return "—"; const a=Math.abs(v);
+  const s = a>=1000? v.toFixed(0) : a>=100? v.toFixed(1) : a>=10? v.toFixed(2) : v.toFixed(3);
+  return s.replace(".",","); }
+
+function openExp(e){
+  ex=e; ex.ch.forEach(c=>{ c.on=c.def; });
+  data={t:[],v:ex.ch.map(()=>[])}; lastVals=null; lastSpec=null; tOffset=0; specView="spectrum";
+  $("#title").textContent=ex.title; $("#desc").textContent=ex.desc;
+  $("#specSeg").hidden=!ex.spectrum; updateSeg();
+  $("#extra").hidden=ex.src!=="geo"; $("#extra").textContent="";
+  renderLegend(); renderValues(); setStatus(available(ex.src)?"":"Bu sensor bu brauzerdə əlçatan deyil. Başqa brauzerdə və ya yerli tətbiqdə yoxlayın.", !available(ex.src));
+  $("#home").hidden=true; $("#exp").hidden=false; window.scrollTo(0,0);
+  requestAnimationFrame(draw);
+}
+function closeExp(){ stop(); ex=null; $("#exp").hidden=true; $("#home").hidden=false; }
+
+function renderLegend(){
+  const L=$("#legend"); L.innerHTML="";
+  ex.ch.forEach(c=>{
+    const b=document.createElement("button"); b.className="chip"; b.style.setProperty("--c",`var(${c.col})`);
+    b.setAttribute("aria-pressed",String(c.on));
+    const i=document.createElement("i"); b.append(i, document.createTextNode(`${c.label}, ${c.unit}`));
+    b.addEventListener("click",()=>{ c.on=!c.on; b.setAttribute("aria-pressed",String(c.on)); renderValues(); draw(); });
+    L.appendChild(b);
+  });
+}
+function renderValues(){
+  const V=$("#values"); V.innerHTML="";
+  ex.ch.forEach((c,i)=>{
+    const d=document.createElement("div"); d.className="val"+(c.on?"":" off"); d.style.setProperty("--c",`var(${c.col})`);
+    const l=document.createElement("div"); l.className="val-l"; l.textContent=c.label;
+    const n=document.createElement("div"); n.className="val-n"; n.id="v"+i; n.textContent=fmt(lastVals?lastVals[i]:NaN);
+    const u=document.createElement("span"); u.className="val-u"; u.textContent=c.unit; n.appendChild(u);
+    d.append(l,n); V.appendChild(d);
+  });
+}
+function updateValues(){
+  if(!lastVals) return;
+  ex.ch.forEach((c,i)=>{ const n=document.getElementById("v"+i); if(n) n.firstChild.nodeValue=fmt(lastVals[i]); });
+}
+function updateSeg(){ document.querySelectorAll("#specSeg button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===specView))); }
+
+/* ---------- Recording ---------- */
+function record(vals){
+  if(!running||!vals) return;
+  const now=performance.now();
+  const t=(now-t0)/1000+tOffset;
+  const dur=+$("#dur").value;
+  if(dur && t>dur+tOffsetStart){ stop("Müddət bitdi."); return; }
+  data.t.push(t); vals.forEach((v,i)=>data.v[i].push(v));
+  if(data.t.length>300000){ data.t.splice(0,50000); data.v.forEach(a=>a.splice(0,50000)); }
+  lastVals=vals; rateTimes.push(now);
+  while(rateTimes.length && now-rateTimes[0]>1000) rateTimes.shift();
+}
+let tOffsetStart=0;
+
+async function prepare(){
+  const s=ex.src;
+  if(s==="motion"||s==="orientation"){
+    const E = s==="motion"? window.DeviceMotionEvent : window.DeviceOrientationEvent;
+    if(E && typeof E.requestPermission==="function"){
+      let r; try{ r=await E.requestPermission(); }catch(e){ r="error"; } if(r!=="granted") throw new Error("Sensora icazə verilmədi. Sayt parametrlərində (ünvan sətrindəki ikon) «Hərəkət sensorları» icazəsini açın.");
+    }
+  } else if(s==="audio"){
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    const AC=window.AudioContext||window.webkitAudioContext; const ctx=new AC();
+    if(ctx.state==="suspended") await ctx.resume();
+    const src=ctx.createMediaStreamSource(stream); const an=ctx.createAnalyser();
+    an.fftSize = ex.spectrum? 8192 : 2048; an.smoothingTimeConstant = ex.spectrum? 0.5 : 0;
+    src.connect(an); sampleRate=ctx.sampleRate;
+    audio={stream,ctx,an,buf:new Float32Array(an.fftSize),fbuf:new Float32Array(an.frequencyBinCount)};
+  } else if(s==="magnetometer"){
+    if(!("Magnetometer" in window)) throw new Error("Maqnitometr bu brauzerdə əlçatan deyil.");
+    mag=new Magnetometer({frequency:30});
+  } else if(s==="geo"){
+    if(!("geolocation" in navigator)) throw new Error("Mövqe xidməti əlçatan deyil.");
+  }
+}
+
+function begin(){
+  t0=performance.now(); tOffset = data.t.length? data.t[data.t.length-1] : 0; tOffsetStart=tOffset;
+  running=true; rateTimes=[]; runBtn.textContent="Dayandır"; runBtn.classList.add("stop");
+  setStatus("Ölçülür…");
+  const s=ex.src;
+  if(s==="motion"){ handlers.motion=e=>record(ex.read(e)); window.addEventListener("devicemotion",handlers.motion); }
+  if(s==="orientation"){ handlers.ori=e=>record(ex.read(e)); window.addEventListener("deviceorientation",handlers.ori); }
+  if(s==="magnetometer"){
+    mag.addEventListener("reading",()=>record([mag.x,mag.y,mag.z,Math.hypot(mag.x,mag.y,mag.z)]));
+    mag.addEventListener("error",e=>{ const n=e.error&&e.error.name; stop(n==="NotAllowedError"?"Maqnitometrə icazə verilmədi.":"Maqnitometr oxunmur: "+(e.error?e.error.message:""),true); });
+    mag.start();
+  }
+  if(s==="geo"){
+    geoId=navigator.geolocation.watchPosition(p=>{
+      const c=p.coords; record([c.speed==null?NaN:c.speed, c.altitude==null?NaN:c.altitude, c.accuracy]);
+      $("#extra").textContent=`Enlik ${c.latitude.toFixed(5).replace(".",",")}°, uzunluq ${c.longitude.toFixed(5).replace(".",",")}°`;
+    }, err=>{
+      const m={1:"Mövqeyə icazə verilmədi.",2:"Mövqe təyin olunmadı. Açıq yerə çıxın.",3:"GPS cavab vermədi."}[err.code]||err.message;
+      setStatus(m,true);
+    }, {enableHighAccuracy:true,maximumAge:0,timeout:30000});
+  }
+  if(navigator.wakeLock){ navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{}); }
+  const wait = s==="geo"? 12000 : 2500;
+  watchdog=setTimeout(()=>{
+    if(running && data.t.length===0){
+      setStatus(s==="geo" ? "GPS siqnalı hələ gəlmir. Açıq havada gözləyin və mövqe icazəsini yoxlayın."
+        : "Sensordan verilənlər gəlmir. Bu cihazda sensor olmaya bilər və ya pəncərə ona çıxışı bağlayır. Səhifəni ayrıca brauzer pəncərəsində açıb yoxlayın.", true);
+    }
+  }, wait);
+  loop();
+}
+
+function loop(){
+  cancelAnimationFrame(rafId);
+  const step=()=>{
+    if(!ex) return;
+    if(running && audio) audioTick();
+    updateValues(); draw();
+    if(running) rafId=requestAnimationFrame(step);
+  };
+  rafId=requestAnimationFrame(step);
+}
+
+function audioTick(){
+  const {an,buf,fbuf}=audio;
+  if(!ex.spectrum){
+    an.getFloatTimeDomainData(buf); let s=0; for(let i=0;i<buf.length;i++) s+=buf[i]*buf[i];
+    const rms=Math.sqrt(s/buf.length); record([20*Math.log10(Math.max(rms,1e-9))]);
+  } else {
+    an.getFloatFrequencyData(fbuf); lastSpec=fbuf;
+    const binHz=sampleRate/an.fftSize; const lo=Math.max(1,Math.floor(40/binHz)); const hi=Math.min(fbuf.length-2,Math.floor(12000/binHz));
+    let mi=lo; for(let i=lo;i<=hi;i++) if(fbuf[i]>fbuf[mi]) mi=i;
+    const a=fbuf[mi-1],b=fbuf[mi],c=fbuf[mi+1]; const den=a-2*b+c; const p= den!==0? 0.5*(a-c)/den : 0;
+    const f=(mi+p)*binHz; const pdb=b - 0.25*(a-c)*p;
+    record([pdb>-90? f : NaN, pdb]);
+  }
+}
+
+async function start(){
+  if(running||countdownTimer) return;
+  setStatus("");
+  if(!window.isSecureContext){
+    setStatus("Səhifə fayl kimi açılıb ("+location.protocol+"//). Sensorlar yalnız HTTPS ünvanında işləyir: faylı GitHub Pages-ə yükləyib github.io linkini Chrome-da açın.",true);
+    return;
+  }
+  try{ await prepare(); }
+  catch(err){
+    const n=err&&err.name;
+    const m = n==="NotAllowedError"? "İcazə verilmədi. Brauzer parametrlərində bu sayt üçün icazəni açın."
+      : n==="NotFoundError"? "Mikrofon tapılmadı."
+      : (err&&err.message)||"Sensor işə düşmədi.";
+    cleanup(); setStatus(m,true); return;
+  }
+  let d=+$("#delay").value;
+  if(!d){ begin(); return; }
+  runBtn.textContent="Ləğv et"; runBtn.classList.add("stop");
+  setStatus(`Başlayır: ${d} s`);
+  countdownTimer=setInterval(()=>{
+    d--; if(d>0){ setStatus(`Başlayır: ${d} s`); return; }
+    clearInterval(countdownTimer); countdownTimer=0; begin();
+  },1000);
+}
+
+function cleanup(){
+  if(handlers.motion) window.removeEventListener("devicemotion",handlers.motion);
+  if(handlers.ori) window.removeEventListener("deviceorientation",handlers.ori);
+  handlers={};
+  if(audio){ if(lastSpec) lastSpec=new Float32Array(lastSpec); audio.stream.getTracks().forEach(t=>t.stop()); audio.ctx.close().catch(()=>{}); audio=null; }
+  if(mag){ try{mag.stop();}catch(e){} mag=null; }
+  if(geoId!=null){ navigator.geolocation.clearWatch(geoId); geoId=null; }
+  if(wake){ wake.release().catch(()=>{}); wake=null; }
+}
+
+function stop(msg,err){
+  clearTimeout(watchdog);
+  if(countdownTimer){ clearInterval(countdownTimer); countdownTimer=0; }
+  const was=running; running=false; cleanup();
+  runBtn.textContent="Başla"; runBtn.classList.remove("stop");
+  if(msg) setStatus(msg,err); else if(was) setStatus(`Dayandırıldı. ${data?data.t.length:0} ölçmə nöqtəsi.`);
+  else setStatus("");
+  if(ex){ updateValues(); draw(); }
+}
+
+/* ---------- Drawing ---------- */
+function niceStep(range,target){ const raw=range/Math.max(target,1); const p=Math.pow(10,Math.floor(Math.log10(raw))); const f=raw/p;
+  return (f<1.5?1:f<3?2:f<7?5:10)*p; }
+function decs(step){ return Math.max(0,-Math.floor(Math.log10(step)+1e-9)); }
+function lab(v,d){ return v.toFixed(d).replace(".",","); }
+function lowerBound(a,x){ let l=0,h=a.length; while(l<h){ const m=(l+h)>>1; if(a[m]<x) l=m+1; else h=m; } return l; }
+
+function setupCanvas(){
+  const dpr=window.devicePixelRatio||1; const W=cv.clientWidth, H=cv.clientHeight;
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,W,H};
+}
+const cssv=()=>{ const s=getComputedStyle(document.documentElement); return n=>s.getPropertyValue(n).trim(); };
+
+function grid(ctx,L,T,pw,ph,x0,x1,xs,y0,y1,ys,col,xLab,yLab){
+  ctx.lineWidth=1;
+  const X=v=>L+(v-x0)/(x1-x0)*pw, Y=v=>T+ph-(v-y0)/(y1-y0)*ph;
+  // minor
+  ctx.strokeStyle=col("--grid-minor"); ctx.beginPath();
+  for(let v=Math.ceil(x0/(xs/5))*(xs/5); v<=x1+1e-9; v+=xs/5){ const x=Math.round(X(v))+.5; ctx.moveTo(x,T); ctx.lineTo(x,T+ph); }
+  for(let v=Math.ceil(y0/(ys/5))*(ys/5); v<=y1+1e-9; v+=ys/5){ const y=Math.round(Y(v))+.5; ctx.moveTo(L,y); ctx.lineTo(L+pw,y); }
+  ctx.stroke();
+  // major + labels
+  ctx.strokeStyle=col("--grid-major"); ctx.fillStyle=col("--muted"); ctx.font="11px "+col("--font"); ctx.beginPath();
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  const xd=decs(xs), yd=decs(ys);
+  for(let v=Math.ceil(x0/xs)*xs; v<=x1+1e-9; v+=xs){ const x=Math.round(X(v))+.5; ctx.moveTo(x,T); ctx.lineTo(x,T+ph); ctx.fillText(xLab?xLab(v):lab(v,xd),x,T+ph+6); }
+  ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let v=Math.ceil(y0/ys)*ys; v<=y1+1e-9; v+=ys){ const y=Math.round(Y(v))+.5; ctx.moveTo(L,y); ctx.lineTo(L+pw,y); ctx.fillText(lab(Math.abs(v)<ys/1e6?0:v,yd),L-6,y); }
+  ctx.stroke();
+  ctx.strokeStyle=col("--ink"); ctx.strokeRect(L+.5,T+.5,pw,ph);
+  ctx.textAlign="left"; ctx.textBaseline="top"; ctx.fillStyle=col("--muted"); ctx.fillText(yLab,L+6,T+5);
+  return {X,Y};
+}
+
+function draw(){
+  if(!ex || $("#exp").hidden) return;
+  if(ex.spectrum && specView==="spectrum") drawSpectrum(); else drawSeries();
+}
+
+function drawSeries(){
+  const {ctx,W,H}=setupCanvas(); const col=cssv();
+  ctx.clearRect(0,0,W,H);
+  const L=50,R=12,T=10,B=26, pw=W-L-R, ph=H-T-B; if(pw<20||ph<20) return;
+  const t=data.t, n=t.length, win=+$("#win").value;
+  let tEnd = n? t[n-1] : 0;
+  if(running) tEnd=Math.max(tEnd,(performance.now()-t0)/1000+tOffset);
+  let x0,x1; if(win){ x1=Math.max(tEnd,win); x0=x1-win; } else { x0=0; x1=Math.max(tEnd,1); }
+  const i0=Math.max(0,lowerBound(t,x0)-1);
+  const vis=ex.ch.map((c,i)=>c.on?i:-1).filter(i=>i>=0);
+  let lo=Infinity, hi=-Infinity;
+  for(const k of vis){ const a=data.v[k]; for(let i=i0;i<n;i++){ const v=a[i]; if(v<lo) lo=v; if(v>hi) hi=v; } }
+  if(!isFinite(lo)||!isFinite(hi)){ lo=-1; hi=1; }
+  if(hi-lo<1e-6){ lo-=1; hi+=1; }
+  const pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
+  const unit = vis.length? ex.ch[vis[0]].unit : ex.ch[0].unit;
+  const {X,Y}=grid(ctx,L,T,pw,ph,x0,x1,niceStep(x1-x0,pw/70),lo,hi,niceStep(hi-lo,ph/42),col,null,unit);
+  ctx.textAlign="right"; ctx.textBaseline="bottom"; ctx.fillStyle=col("--muted"); ctx.fillText("t, s",L+pw-4,T+ph-4);
+  ctx.save(); ctx.beginPath(); ctx.rect(L,T,pw,ph); ctx.clip();
+  const stride=Math.max(1,Math.floor((n-i0)/(pw*2)));
+  ctx.lineWidth=1.7; ctx.lineJoin="round";
+  for(const k of vis){
+    ctx.strokeStyle=col(ex.ch[k].col); ctx.beginPath(); let pen=false; const a=data.v[k];
+    for(let i=i0;i<n;i+=stride){ const v=a[i]; if(!isFinite(v)){ pen=false; continue; }
+      const x=X(t[i]), y=Y(v); if(pen) ctx.lineTo(x,y); else { ctx.moveTo(x,y); pen=true; } }
+    ctx.stroke();
+  }
+  ctx.restore();
+  if(!n){ ctx.fillStyle=col("--muted"); ctx.font="14px "+col("--font"); ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(running?"Verilənlər gözlənilir…":"Ölçməyə başlamaq üçün «Başla» düyməsini basın",L+pw/2,T+ph/2); }
+  else if(running){ ctx.fillStyle=col("--muted"); ctx.font="11px "+col("--font"); ctx.textAlign="right"; ctx.textBaseline="top";
+    ctx.fillText(`${rateTimes.length} ölçmə/s`,L+pw-6,T+5); }
+}
+
+function drawSpectrum(){
+  const {ctx,W,H}=setupCanvas(); const col=cssv();
+  ctx.clearRect(0,0,W,H);
+  const L=46,R=12,T=10,B=26, pw=W-L-R, ph=H-T-B; if(pw<20||ph<20) return;
+  const f0=40, f1=Math.min(12000,sampleRate/2), l0=Math.log10(f0), l1=Math.log10(f1);
+  const X=f=>L+(Math.log10(f)-l0)/(l1-l0)*pw; const y0=-110,y1=-10; const Y=v=>T+ph-(v-y0)/(y1-y0)*ph;
+  ctx.lineWidth=1;
+  // grid: log decades
+  ctx.strokeStyle=col("--grid-minor"); ctx.beginPath();
+  for(let d=10; d<=10000; d*=10) for(let m=1;m<10;m++){ const f=d*m; if(f<f0||f>f1) continue; const x=Math.round(X(f))+.5; ctx.moveTo(x,T); ctx.lineTo(x,T+ph); }
+  for(let v=y0; v<=y1; v+=5){ const y=Math.round(Y(v))+.5; ctx.moveTo(L,y); ctx.lineTo(L+pw,y); }
+  ctx.stroke();
+  ctx.strokeStyle=col("--grid-major"); ctx.fillStyle=col("--muted"); ctx.font="11px "+col("--font"); ctx.beginPath();
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  [50,100,200,500,1000,2000,5000,10000].forEach(f=>{ if(f<f0||f>f1) return; const x=Math.round(X(f))+.5; ctx.moveTo(x,T); ctx.lineTo(x,T+ph);
+    ctx.fillText(f>=1000? (f/1000)+"k" : String(f), x, T+ph+6); });
+  ctx.textAlign="right"; ctx.textBaseline="middle";
+  for(let v=-100; v<=-20; v+=20){ const y=Math.round(Y(v))+.5; ctx.moveTo(L,y); ctx.lineTo(L+pw,y); ctx.fillText(String(v),L-6,y); }
+  ctx.stroke(); ctx.strokeStyle=col("--ink"); ctx.strokeRect(L+.5,T+.5,pw,ph);
+  ctx.textAlign="left"; ctx.textBaseline="top"; ctx.fillText("dB",L+6,T+5);
+  ctx.textAlign="right"; ctx.textBaseline="bottom"; ctx.fillText("tezlik, Hz",L+pw-4,T+ph-4);
+  const s=lastSpec;
+  if(!s){ ctx.fillStyle=col("--muted"); ctx.font="14px "+col("--font"); ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("Ölçməyə başlamaq üçün «Başla» düyməsini basın",L+pw/2,T+ph/2); return; }
+  const binHz=sampleRate/(s.length*2);
+  ctx.save(); ctx.beginPath(); ctx.rect(L,T,pw,ph); ctx.clip();
+  ctx.strokeStyle=col("--cz"); ctx.lineWidth=1.5; ctx.beginPath(); let pen=false, lastX=-1, maxY=Infinity;
+  for(let i=1;i<s.length;i++){ const f=i*binHz; if(f<f0) continue; if(f>f1) break;
+    const x=X(f), v=isFinite(s[i])?Math.max(s[i],y0):y0, y=Y(v);
+    if(Math.floor(x)===lastX){ if(y<maxY){ maxY=y; ctx.lineTo(x,y);} continue; }
+    lastX=Math.floor(x); maxY=y; if(pen) ctx.lineTo(x,y); else { ctx.moveTo(x,y); pen=true; } }
+  ctx.stroke();
+  const pf=lastVals&&lastVals[0];
+  if(isFinite(pf)){ const x=X(pf); ctx.strokeStyle=col("--cx"); ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,T+ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=col("--cx"); ctx.font="600 12px "+col("--font"); ctx.textAlign= x>L+pw-90?"right":"left"; ctx.textBaseline="top";
+    ctx.fillText(fmt(pf)+" Hz", x+(ctx.textAlign==="left"?6:-6), T+22); }
+  ctx.restore();
+}
+
+/* ---------- CSV ---------- */
+let dlCap=null; const inClaude=!!(window.claude&&typeof window.claude.use==="function");
+if(inClaude){ window.claude.use("downloads").then(d=>{ dlCap=d; if(!d) $("#csv").hidden=true; }).catch(()=>{ $("#csv").hidden=true; }); }
+
+function stamp(){ const d=new Date(), p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
+function num(v){ return isFinite(v)? String(+v.toPrecision(7)) : ""; }
+
+async function saveCSV(){
+  let text, name;
+  if(ex.spectrum && specView==="spectrum"){
+    if(!lastSpec){ setStatus("Saxlamaq üçün əvvəlcə ölçmə aparın.",true); return; }
+    const binHz=sampleRate/(lastSpec.length*2); const rows=["tezlik (Hz),səviyyə (dB)"];
+    for(let i=1;i<lastSpec.length;i++) rows.push(num(i*binHz)+","+num(lastSpec[i]));
+    text=rows.join("\n"); name=`${ex.id}_spektr_${stamp()}.csv`;
+  } else {
+    if(!data.t.length){ setStatus("Saxlamaq üçün əvvəlcə ölçmə aparın.",true); return; }
+    const rows=["t (s),"+ex.ch.map(c=>`${c.label} (${c.unit})`).join(",")];
+    for(let i=0;i<data.t.length;i++) rows.push(num(data.t[i])+","+data.v.map(a=>num(a[i])).join(","));
+    text=rows.join("\n"); name=`${ex.id}_${stamp()}.csv`;
+  }
+  text="\ufeff"+text;
+  if(inClaude){
+    if(!dlCap){ setStatus("Bu pəncərədə fayl saxlamaq mümkün deyil.",true); return; }
+    try{ await dlCap.save({filename:name,data:text}); setStatus("Fayl saxlanıldı: "+name); }
+    catch(e){ if(e&&e.code==="declined") return; if(e&&e.code==="rate_limited"){ setStatus("Bir az gözləyib yenidən cəhd edin.",true); return; }
+      setStatus("Fayl saxlanılmadı: "+((e&&e.message)||"naməlum xəta"),true); }
+    return;
+  }
+  const url=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000); setStatus("Fayl saxlanıldı: "+name);
+}
+
+/* ---------- Events ---------- */
+runBtn.addEventListener("click",()=>{ if(running||countdownTimer) stop(countdownTimer?"Ləğv edildi.":null); else start(); });
+$("#clear").addEventListener("click",()=>{ if(!ex) return; data={t:[],v:ex.ch.map(()=>[])}; lastVals=null; if(!running) lastSpec=null; tOffset=0; renderValues(); setStatus(running?"Ölçülür…":""); draw(); });
+$("#csv").addEventListener("click",saveCSV);
+$("#back").addEventListener("click",closeExp);
+$("#win").addEventListener("change",draw);
+document.querySelectorAll("#specSeg button").forEach(b=>b.addEventListener("click",()=>{ specView=b.dataset.v; updateSeg(); draw(); }));
+new ResizeObserver(()=>draw()).observe(cv);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw);
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && running) stop("Səhifə arxa plana keçdi, ölçmə dayandırıldı."); });
+
+renderHome();
+})();
+</script>
+</body>
+</html>
