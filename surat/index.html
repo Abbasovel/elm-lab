@@ -382,7 +382,12 @@ function renderLive(){
   const chips=[];
   const hz=S.hz; const hzCls= hz>=18?"good": hz>=8?"warn":"bad";
   chips.push(`<span class="chip ${S.samples.length?hzCls:""}">Tezlik <b>${S.samples.length?hz.toFixed(1):"—"} Hz</b></span>`);
-  if(S.sats!=null) chips.push(`<span class="chip ${S.sats>=10?"good":S.sats>=6?"warn":"bad"}">Peyk <b>${S.sats}</b></span>`);
+  if(S.satInfo){ const d=S.satInfo;
+    chips.push(`<span class="chip ${d.used>=10?"good":d.used>=6?"warn":"bad"}">Peyk <b>${d.used}/${d.total}</b></span>`);
+    const by=Object.entries(d.by||{}).map(([k,v])=>`${k} <b>${v}</b>`).join(" · ");
+    if(by) chips.push(`<span class="chip">${by}</span>`);
+    if(d.cn0) chips.push(`<span class="chip ${d.cn0>=35?"good":d.cn0>=28?"warn":"bad"}">Siqnal <b>${d.cn0} dB-Hz</b></span>`);
+  } else if(S.sats!=null) chips.push(`<span class="chip ${S.sats>=10?"good":S.sats>=6?"warn":"bad"}">Peyk <b>${S.sats}</b></span>`);
   if(S.hAcc!=null) chips.push(`<span class="chip ${S.hAcc<=2?"good":S.hAcc<=6?"warn":"bad"}">Mövqe ± <b>${S.hAcc.toFixed(1)} m</b></span>`);
   if(S.sAcc!=null) chips.push(`<span class="chip ${S.sAcc<=0.3?"good":S.sAcc<=0.8?"warn":"bad"}">Sürət ± <b>${(S.sAcc*KMH).toFixed(1)} km/saat</b></span>`);
   if(S.src==="phone") chips.push(`<span class="chip ${S.calib?(S.fused?"good":"warn"):"bad"}">Akselerometr <b>${S.calib?(S.fused?"birləşdirilib":"oxu öyrənilir"):"kalibrsiz"}</b></span>`);
@@ -443,12 +448,15 @@ function drawChart(){
 let toastT; function toast(m){ let el=document.querySelector(".toast"); if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el);} el.textContent=m; el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>el.hidden=true,3500); }
 
 // ================= Mənbələr =================
+// Android tətbiqində (WebView) nativ körpü: peyklər + Bluetooth
+const NATIVE = (typeof window.ElmNative!=="undefined") ? window.ElmNative : null;
+window.elmNative = { onStatus:m=>toast(m), onError:m=>toast(m) };
 let stopFn=null;
 let gen=0;
 async function selectSource(k){
   const my=++gen;
   if(stopFn){ try{stopFn();}catch(e){} stopFn=null; }
-  S.src=k; S.samples=[]; S.run=null; S.hz=0; S.sats=S.hAcc=S.sAcc=S.batt=null; S.fused=false; S.stopSince=null; S.lastG=0;
+  S.src=k; S.samples=[]; S.run=null; S.hz=0; S.sats=S.hAcc=S.sAcc=S.batt=null; S.satInfo=null; S.fused=false; S.stopSince=null; S.lastG=0;
   document.querySelectorAll("#src button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.src===k?"true":"false"));
   try{
     if(k==="phone"){ const f=await startPhone(); if(my!==gen){f();return;} stopFn=f; }
@@ -461,15 +469,25 @@ async function selectSource(k){
 // ---- Telefon: Geolocation + DeviceMotion birləşməsi ----
 const M={g0:null, fwd:null, corr:[0,0,0], lastFix:null, vEst:0, lastMt:null, bias:0, hist:[], launchArm:0};
 async function startPhone(){
-  if(!("geolocation" in navigator)) throw new Error("Bu brauzerdə GPS yoxdur.");
+  if(!NATIVE && !("geolocation" in navigator)) throw new Error("Bu brauzerdə GPS yoxdur.");
   if(typeof DeviceMotionEvent!=="undefined" && typeof DeviceMotionEvent.requestPermission==="function"){
     try{ await DeviceMotionEvent.requestPermission(); }catch(e){}
   }
   const onMotion=ev=>motion(ev);
   window.addEventListener("devicemotion",onMotion);
+  let stopGeo;
+  if(NATIVE){
+    elmNative.onFix=f=>onFix({timestamp:f.t, coords:{latitude:f.lat, longitude:f.lon, speed:f.spd>=0?f.spd:null,
+      accuracy:f.acc>=0?f.acc:null, altitude:f.alt==null?null:f.alt, speedAccuracy:f.sacc>=0?f.sacc:null}});
+    elmNative.onSats=d=>{ S.satInfo=d; S.sats=d.used; renderLive(); };
+    NATIVE.startGnss();
+    stopGeo=()=>{ NATIVE.stopGnss(); elmNative.onFix=elmNative.onSats=null; };
+  } else {
   const id=navigator.geolocation.watchPosition(onFix, err=>{ const blocked=/permission|policy|denied/i.test(err.message)||err.code===1; toast(blocked?"GPS icazəsi yoxdur. Səhifəni Safari/Chrome-da HTTPS ünvandan açın və yer (location) icazəsi verin.":"GPS xətası: "+err.message); }, {enableHighAccuracy:true, maximumAge:0, timeout:15000});
+  stopGeo=()=>navigator.geolocation.clearWatch(id);
+  }
   let fuseTimer=setInterval(fuseTick,100);
-  return ()=>{ navigator.geolocation.clearWatch(id); window.removeEventListener("devicemotion",onMotion); clearInterval(fuseTimer); };
+  return ()=>{ stopGeo(); window.removeEventListener("devicemotion",onMotion); clearInterval(fuseTimer); };
 }
 function hav(a,b){ const R=6371000,toR=Math.PI/180, dLa=(b.lat-a.lat)*toR, dLo=(b.lon-a.lon)*toR;
   const h=Math.sin(dLa/2)**2+Math.cos(a.lat*toR)*Math.cos(b.lat*toR)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
@@ -477,7 +495,7 @@ function onFix(pos){
   const c=pos.coords, t=pos.timestamp/1000;
   let v=c.speed;
   if(v==null||isNaN(v)){ if(M.lastFix){ const dt=t-M.lastFix.t; v= dt>0? hav(M.lastFix,{lat:c.latitude,lon:c.longitude})/dt : 0; } else v=0; }
-  S.hAcc=c.accuracy; S.sAcc=null;
+  S.hAcc=c.accuracy; S.sAcc=(c.speedAccuracy==null)?null:c.speedAccuracy;
   const fix={t,lat:c.latitude,lon:c.longitude,v,alt:c.altitude};
   // irəli oxunu öyrən: üfüqi təcil vektoru × GPS dv/dt korrelyasiyası
   if(M.lastFix && M.g0){ const dt=t-M.lastFix.t; if(dt>0.3 && dt<3){ const a=(v-M.lastFix.v)/dt;
@@ -530,6 +548,14 @@ function calibrate(){
 // ---- BLE: RaceBox Mini (0xFF 0x01) və u-blox NAV-PVT (0x01 0x07), Nordic UART servisi ----
 const NUS="6e400001-b5a3-f393-e0a9-e50e24dcca9e", NUS_TX="6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 async function startBLE(kind){
+  towPrev=null; towOff=0;
+  if(NATIVE){
+    const parser=ubxStream(onUbx);
+    elmNative.onBle=b64=>{ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); parser(u); };
+    elmNative.onBleDisconnected=()=>{ if(S.src===kind) toast("Cihazla əlaqə kəsildi."); };
+    NATIVE.startBle(kind);
+    return ()=>{ NATIVE.stopBle(); elmNative.onBle=null; };
+  }
   if(!navigator.bluetooth) throw new Error("Web Bluetooth yoxdur: Android Chrome lazımdır (iPhone Safari dəstəkləmir).");
   const filters = kind==="racebox" ? [{namePrefix:"RaceBox"}] : [{namePrefix:"ElmGPS"},{services:[NUS]}];
   const dev = await navigator.bluetooth.requestDevice({filters, optionalServices:[NUS]});
@@ -617,6 +643,7 @@ $("themeBtn").onclick=()=>{ const r=document.documentElement, cur=r.dataset.them
 try{ const th=localStorage.getItem("gsa_theme"); if(th) document.documentElement.dataset.theme=th; }catch(e){}
 window.addEventListener("resize",drawChart);
 setInterval(()=>{ if(S.run && S.run.moved && S.lastRun==null) drawChart(); },1000);
+if(NATIVE){ const b=document.querySelector('[data-src="phone"] small'); if(b) b.textContent="nativ GNSS + peyklər"; }
 renderSlip(); renderHist(); renderLive(); drawChart();
 selectSource("demo");
 if(typeof module!=="undefined") module.exports={analyze,ubxStream};
