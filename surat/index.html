@@ -84,6 +84,26 @@ input[type=number]{width:72px;font:500 .9rem var(--f-data);padding:6px;border-ra
 .hist{display:grid;gap:6px;font:400 .82rem var(--f-data)}
 .hist div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:5px 0;flex-wrap:wrap}
 .hist em{font-style:normal;color:var(--muted)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand img{height:34px;width:auto;flex:none}
+.by{font:500 .72rem var(--f-display);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:3px}
+.by b{color:var(--fg);font-weight:700}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.tools .btn{width:100%;padding:11px 8px}
+.about{border-top:1px solid var(--line);padding-top:18px;display:grid;gap:14px;font-size:.88rem}
+.about-head{display:flex;align-items:center;gap:12px}
+.about-head img{height:44px;width:auto}
+.about-head strong{font:700 1.05rem var(--f-display);display:block}
+.about-head span{color:var(--muted);font-style:italic}
+.about p{margin:0;max-width:65ch;color:var(--muted)}
+.about dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0}
+.about dt{font:500 .72rem var(--f-display);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding-top:2px}
+.about dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.about a{color:var(--accent);text-decoration:none}
+.about a:hover{text-decoration:underline}
+.svc{display:flex;flex-wrap:wrap;gap:6px}
+.svc span{font:500 .75rem var(--f-body);padding:4px 9px;border:1px solid var(--line);border-radius:99px}
+.fine{font-size:.75rem;color:var(--muted)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);
   padding:10px 16px;border-radius:8px;font-weight:500;max-width:calc(100% - 32px)}
 @media (max-width:460px){.src{grid-template-columns:repeat(2,1fr)}.gauge{grid-template-columns:1fr}.side{grid-template-columns:repeat(3,1fr);text-align:left}}
@@ -92,7 +112,10 @@ input[type=number]{width:72px;font:500 .9rem var(--f-data);padding:6px;border-ra
 <body>
 <div class="wrap">
   <header>
-    <h1>GPS Sürət <span>Analizatoru</span></h1>
+    <div class="brand">
+      <img src="https://autoproject.az/logo.svg" alt="AutoProject" onerror="this.hidden=true">
+      <div><h1>GPS Sürət <span>Analizatoru</span></h1><div class="by">Hazırladı: <b>AutoProject</b></div></div>
+    </div>
     <div class="row"><button class="btn" id="themeBtn" type="button">Tema</button></div>
   </header>
 
@@ -118,6 +141,10 @@ input[type=number]{width:72px;font:500 .9rem var(--f-data);padding:6px;border-ra
     </div>
     <div class="gbar" aria-hidden="true"><i id="gfill"></i></div>
     <div class="state" id="state" data-s="wait"><span class="dot"></span><span id="stateTxt">Mənbə seçin</span></div>
+    <div class="tools">
+      <button class="btn" id="calBtn" type="button">Akselerometri kalibrlə</button>
+      <button class="btn" id="zeroBtn" type="button">Sıfırla</button>
+    </div>
   </section>
 
   <section class="panel" aria-label="Nəticələr">
@@ -141,17 +168,38 @@ input[type=number]{width:72px;font:500 .9rem var(--f-data);padding:6px;border-ra
         <input type="number" id="cTo" value="160" min="0" max="400"> km/saat</label>
     </div>
     <div class="row" style="margin-top:12px">
-      <button class="btn" id="calBtn" type="button">Akselerometri kalibrlə</button>
       <button class="btn" id="csvBtn" type="button">CSV yüklə</button>
-      <button class="btn" id="resetBtn" type="button">Sessiyanı sıfırla</button>
+      <button class="btn" id="resetBtn" type="button">Tarixçəni və rekordları sil</button>
     </div>
-    <p class="note">Kalibrləmə: telefonu avtomobildə <b>bərk</b> bərkidin, maşın dayanarkən basın. Telefon ölçmə vaxtı tərpənməməlidir.</p>
+    <p class="note"><b>Sıfırla</b> (yuxarıda) cari göstəriciləri — maks. sürəti, məsafəni, gedən ölçməni — təmizləyir; tarixçə qalır. Kalibrləmə: telefonu avtomobildə <b>bərk</b> bərkidin, maşın dayanarkən basın. Telefon ölçmə vaxtı tərpənməməlidir.</p>
   </section>
 
   <section class="panel" aria-label="Tarixçə">
     <h2>Tarixçə</h2>
     <div class="hist" id="hist"></div>
   </section>
+
+  <footer class="about" aria-label="Şirkət haqqında">
+    <div class="about-head">
+      <img src="https://autoproject.az/logo.svg" alt="" onerror="this.hidden=true">
+      <div><strong>AutoProject</strong><span>Düzəlməyən maşın yoxdur!</span></div>
+    </div>
+    <p>Bakıda elektrik və hibrid avtomobillərin diaqnostikası, təmiri və proqramlaşdırılması üzrə servis mərkəzi. Nasazlığın kök səbəbini tapırıq, hissələri təxmini dəyişmirik.</p>
+    <div class="svc">
+      <span>Diaqnostika və osilloqraf</span><span>Yüksək gərginlik: batareya, BMS, HVIL</span>
+      <span>OBC/PDU, DC/DC, invertor</span><span>Kondisioner kompressoru, istilik nasosu</span>
+      <span>ADAS radar və kamera kalibrləməsi</span><span>Proqramlaşdırma, VIN, açar</span>
+      <span>CAN, CAN-FD, Ethernet, DoIP</span>
+    </div>
+    <dl>
+      <dt>Markalar</dt><dd>BYD, Changan, Deepal, Li Auto, Zeekr, Tesla, NIO, Avatr, Voyah, Denza, Geely, VW ID., Polestar, Toyota, Honda</dd>
+      <dt>Ünvan</dt><dd>Başir Bünyadov 4c, Bakı</dd>
+      <dt>Telefon</dt><dd><a href="tel:+994102508500">+994 10 250 85 00</a> · <a href="https://wa.me/994102508500" target="_blank" rel="noopener">WhatsApp</a></dd>
+      <dt>İş vaxtı</dt><dd>B.e.–Şənbə, 09:00–18:00</dd>
+      <dt>Sosial</dt><dd><a href="https://www.instagram.com/ecardoctor_autoproject/" target="_blank" rel="noopener">Instagram</a> · <a href="https://www.tiktok.com/@elecrticcarservice" target="_blank" rel="noopener">TikTok</a> · <a href="https://autoproject.az/" target="_blank" rel="noopener">autoproject.az</a></dd>
+    </dl>
+    <div class="fine">© 2026 AutoProject · GPS Sürət Analizatoru</div>
+  </footer>
 </div>
 
 <script>
@@ -558,8 +606,11 @@ function csv(){
   a.href=URL.createObjectURL(blob); a.download="olcme-"+S.lastRun.when.replace(/[:.]/g,"-")+".csv"; document.body.appendChild(a); a.click(); a.remove();
 }
 $("src").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) selectSource(b.dataset.src); });
-$("calBtn").onclick=calibrate; $("csvBtn").onclick=csv;
-$("resetBtn").onclick=()=>{ S.best={}; S.history=[]; S.lastRun=null; S.vmax=0; try{localStorage.removeItem("gsa_best");localStorage.removeItem("gsa_hist");}catch(e){} renderSlip(); renderHist(); drawChart(); toast("Sessiya sıfırlandı."); };
+$("calBtn").onclick=calibrate;
+$("zeroBtn").onclick=()=>{ S.vmax=0; S.run=null; S.live=null; S.lastRun=null; S.stopSince=null; S.lastG=0;
+  const last=S.samples[S.samples.length-1]; S.samples= last? [last] : [];
+  renderLive(); renderSlip(); drawChart(); toast("Cari göstəricilər sıfırlandı."); }; $("csvBtn").onclick=csv;
+$("resetBtn").onclick=()=>{ S.best={}; S.history=[]; S.lastRun=null; S.vmax=0; try{localStorage.removeItem("gsa_best");localStorage.removeItem("gsa_hist");}catch(e){} renderSlip(); renderHist(); drawChart(); toast("Tarixçə və rekordlar silindi."); };
 ["rollout","cFrom","cTo"].forEach(id=>$(id).addEventListener("change",()=>{ if(S.lastRun){ S.lastRun.R=analyze(S.lastRun.s,{...opts(),accelLaunch:null}); } renderSlip(); }));
 $("themeBtn").onclick=()=>{ const r=document.documentElement, cur=r.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
   r.dataset.theme = cur==="dark"?"light":"dark"; try{localStorage.setItem("gsa_theme",r.dataset.theme);}catch(e){} drawChart(); };
