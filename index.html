@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#11151b">
+<title>GPS Sürət Analizatoru</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: alət paneli — yuxarıda mənbə + siqnal keyfiyyəti, ortada böyük spidometr, altda "timeslip" nəticə cədvəli */
+:root{
+  --bg:#11151b; --panel:#181d25; --line:#2a313c; --fg:#e8ecf1; --muted:#8b96a5;
+  --accent:#f2b705; --accent-ink:#11151b; --good:#3ecf8e; --warn:#f5a524; --bad:#ef5350; --track:#232a34;
+  --f-display:"IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#f3f5f8; --panel:#ffffff; --line:#d9dee6; --fg:#141a22; --muted:#5d6876;
+  --accent:#b58700; --accent-ink:#ffffff; --good:#1c9b62; --warn:#b86e00; --bad:#c62828; --track:#e6eaf0; color-scheme:light } }
+:root[data-theme="light"]{
+  --bg:#f3f5f8; --panel:#ffffff; --line:#d9dee6; --fg:#141a22; --muted:#5d6876;
+  --accent:#b58700; --accent-ink:#ffffff; --good:#1c9b62; --warn:#b86e00; --bad:#c62828; --track:#e6eaf0; color-scheme:light }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:max(12px,env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-bottom,0px))}
+.wrap{max-width:760px;margin:0 auto;display:grid;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font:700 1.35rem/1.1 var(--f-display);margin:0;letter-spacing:.01em;text-wrap:balance}
+h1 span{color:var(--accent)}
+h2{font:700 .78rem/1 var(--f-display);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.src{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.src button{font:600 .82rem/1.15 var(--f-body);padding:10px 6px;border-radius:8px;border:1px solid var(--line);
+  background:transparent;color:var(--fg);cursor:pointer;min-width:0}
+.src button small{display:block;font:400 .7rem var(--f-data);color:var(--muted);margin-top:3px}
+.src button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.src button[aria-pressed="true"] small{color:var(--accent-ink);opacity:.8}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font:500 .75rem var(--f-data);padding:4px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.chip b{color:var(--fg);font-weight:600}
+.chip.good{border-color:var(--good)} .chip.good b{color:var(--good)}
+.chip.warn{border-color:var(--warn)} .chip.warn b{color:var(--warn)}
+.chip.bad{border-color:var(--bad)} .chip.bad b{color:var(--bad)}
+.gauge{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:end}
+.speed{font:600 clamp(4.5rem,24vw,8.5rem)/.85 var(--f-data);font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.speed small{font:500 1rem var(--f-display);letter-spacing:.05em;color:var(--muted);margin-left:6px}
+.side{display:grid;gap:8px;text-align:right}
+.side div{font:600 1.15rem var(--f-data);font-variant-numeric:tabular-nums}
+.side span{display:block;font:500 .68rem var(--f-display);text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.state{margin-top:12px;display:flex;align-items:center;gap:10px;font-weight:500}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+.state[data-s="ready"] .dot{background:var(--good)}
+.state[data-s="run"] .dot{background:var(--accent);animation:p 1s infinite}
+.state[data-s="wait"] .dot{background:var(--warn)}
+@keyframes p{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.state[data-s="run"] .dot{animation:none}}
+.gbar{height:6px;background:var(--track);border-radius:3px;margin-top:12px;position:relative;overflow:hidden}
+.gbar i{position:absolute;top:0;bottom:0;left:50%;background:var(--accent);width:0}
+.slip{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.slip th{font:500 .72rem var(--f-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+.slip th:first-child,.slip td:first-child{text-align:left}
+.slip td{font:400 .95rem var(--f-data);padding:8px 4px;border-bottom:1px dashed var(--line);text-align:right}
+.slip td:first-child{font:600 .9rem var(--f-body)}
+.slip td.best{color:var(--accent);font-weight:600}
+.slip td.na{color:var(--muted)}
+.slip tr.grp td{font:700 .7rem var(--f-display);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);border-bottom:0;padding-top:14px}
+.tbl{overflow-x:auto}
+canvas{width:100%;height:190px;display:block}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:600 .85rem var(--f-body);padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+label{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+input[type=number]{width:72px;font:500 .9rem var(--f-data);padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.note{font-size:.82rem;color:var(--muted);max-width:65ch;margin:8px 0 0}
+.note b{color:var(--fg)}
+.hist{display:grid;gap:6px;font:400 .82rem var(--f-data)}
+.hist div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:5px 0;flex-wrap:wrap}
+.hist em{font-style:normal;color:var(--muted)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand img{height:34px;width:auto;flex:none}
+.by{font:500 .72rem var(--f-display);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:3px}
+.by b{color:var(--fg);font-weight:700}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.tools .btn{width:100%;padding:11px 8px}
+.about{border-top:1px solid var(--line);padding-top:18px;display:grid;gap:14px;font-size:.88rem}
+.about-head{display:flex;align-items:center;gap:12px}
+.about-head img{height:44px;width:auto}
+.about-head strong{font:700 1.05rem var(--f-display);display:block}
+.about-head span{color:var(--muted);font-style:italic}
+.about p{margin:0;max-width:65ch;color:var(--muted)}
+.about dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0}
+.about dt{font:500 .72rem var(--f-display);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding-top:2px}
+.about dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.about a{color:var(--accent);text-decoration:none}
+.about a:hover{text-decoration:underline}
+.svc{display:flex;flex-wrap:wrap;gap:6px}
+.svc span{font:500 .75rem var(--f-body);padding:4px 9px;border:1px solid var(--line);border-radius:99px}
+.fine{font-size:.75rem;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);
+  padding:10px 16px;border-radius:8px;font-weight:500;max-width:calc(100% - 32px)}
+@media (max-width:460px){.src{grid-template-columns:repeat(2,1fr)}.gauge{grid-template-columns:1fr}.side{grid-template-columns:repeat(3,1fr);text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <img src="https://autoproject.az/logo.svg" alt="AutoProject" onerror="this.hidden=true">
+      <div><h1>GPS Sürət <span>Analizatoru</span></h1><div class="by">Hazırladı: <b>AutoProject</b></div></div>
+    </div>
+    <div class="row"><button class="btn" id="themeBtn" type="button">Tema</button></div>
+  </header>
+
+  <section class="panel" aria-label="Mənbə">
+    <h2>Məlumat mənbəyi</h2>
+    <div class="src" id="src">
+      <button type="button" data-src="phone" aria-pressed="false">Telefon GPS<small>~1 Hz + akselerometr</small></button>
+      <button type="button" data-src="racebox" aria-pressed="false">RaceBox Mini<small>BLE · 25 Hz</small></button>
+      <button type="button" data-src="ubx" aria-pressed="false">Öz cihazım<small>ESP32 + u-blox</small></button>
+      <button type="button" data-src="demo" aria-pressed="true">Demo<small>simulyasiya</small></button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="panel" aria-label="Sürət">
+    <div class="gauge">
+      <div class="speed" id="spd">0<small>km/saat</small></div>
+      <div class="side">
+        <div><span>Maks.</span><b id="vmax">0</b></div>
+        <div><span>Təcil, g</span><b id="glong">0.00</b></div>
+        <div><span>Məsafə</span><b id="dist">0 m</b></div>
+      </div>
+    </div>
+    <div class="gbar" aria-hidden="true"><i id="gfill"></i></div>
+    <div class="state" id="state" data-s="wait"><span class="dot"></span><span id="stateTxt">Mənbə seçin</span></div>
+    <div class="tools">
+      <button class="btn" id="calBtn" type="button">Akselerometri kalibrlə</button>
+      <button class="btn" id="zeroBtn" type="button">Sıfırla</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Nəticələr">
+    <h2>Nəticələr</h2>
+    <div class="tbl"><table class="slip" id="slip"></table></div>
+    <p class="note" id="slope"></p>
+  </section>
+
+  <section class="panel" aria-label="Qrafik">
+    <h2>Sürət — zaman (son ölçmə)</h2>
+    <canvas id="chart" width="720" height="190"></canvas>
+  </section>
+
+  <section class="panel" aria-label="Ayarlar">
+    <h2>Ayarlar</h2>
+    <div class="row">
+      <label><input type="checkbox" id="rollout"> 1 ft rollout (drag zolağı kimi)</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label>Öz pəncərən: <input type="number" id="cFrom" value="80" min="0" max="400"> →
+        <input type="number" id="cTo" value="160" min="0" max="400"> km/saat</label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="csvBtn" type="button">CSV yüklə</button>
+      <button class="btn" id="resetBtn" type="button">Tarixçəni və rekordları sil</button>
+    </div>
+    <p class="note"><b>Sıfırla</b> (yuxarıda) cari göstəriciləri — maks. sürəti, məsafəni, gedən ölçməni — təmizləyir; tarixçə qalır. Kalibrləmə avtomatikdir: maşın dayananda və telefon sakit olanda g vektoru özü yenilənir. Əl ilə də basa bilərsiniz — telefon <b>bərk</b> bərkidilmiş, maşın dayanmış olmalıdır.</p>
+  </section>
+
+  <section class="panel" aria-label="Tarixçə">
+    <h2>Tarixçə</h2>
+    <div class="hist" id="hist"></div>
+  </section>
+
+  <footer class="about" aria-label="Şirkət haqqında">
+    <div class="about-head">
+      <img src="https://autoproject.az/logo.svg" alt="" onerror="this.hidden=true">
+      <div><strong>AutoProject</strong><span>Düzəlməyən maşın yoxdur!</span></div>
+    </div>
+    <p>Bakıda elektrik və hibrid avtomobillərin diaqnostikası, təmiri və proqramlaşdırılması üzrə servis mərkəzi. Nasazlığın kök səbəbini tapırıq, hissələri təxmini dəyişmirik.</p>
+    <div class="svc">
+      <span>Diaqnostika və osilloqraf</span><span>Yüksək gərginlik: batareya, BMS, HVIL</span>
+      <span>OBC/PDU, DC/DC, invertor</span><span>Kondisioner kompressoru, istilik nasosu</span>
+      <span>ADAS radar və kamera kalibrləməsi</span><span>Proqramlaşdırma, VIN, açar</span>
+      <span>CAN, CAN-FD, Ethernet, DoIP</span>
+    </div>
+    <dl>
+      <dt>Markalar</dt><dd>BYD, Changan, Deepal, Li Auto, Zeekr, Tesla, NIO, Avatr, Voyah, Denza, Geely, VW ID., Polestar, Toyota, Honda</dd>
+      <dt>Ünvan</dt><dd>Başir Bünyadov 4c, Bakı</dd>
+      <dt>Telefon</dt><dd><a href="tel:+994102508500">+994 10 250 85 00</a> · <a href="https://wa.me/994102508500" target="_blank" rel="noopener">WhatsApp</a></dd>
+      <dt>İş vaxtı</dt><dd>B.e.–Şənbə, 09:00–18:00</dd>
+      <dt>Sosial</dt><dd><a href="https://www.instagram.com/ecardoctor_autoproject/" target="_blank" rel="noopener">Instagram</a> · <a href="https://www.tiktok.com/@elecrticcarservice" target="_blank" rel="noopener">TikTok</a> · <a href="https://autoproject.az/" target="_blank" rel="noopener">autoproject.az</a></dd>
+    </dl>
+    <div class="fine">© 2026 AutoProject · GPS Sürət Analizatoru</div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+// ================= Konstantlar =================
+const KMH = 3.6, G = 9.80665;
+const ACC = [[0,60],[0,100],[0,150],[0,200],[60,100],[80,120],[100,200]];
+const DIST = [[201.168,"1/8 mil (201 m)"],[402.336,"1/4 mil (402 m)"],[1000,"1 km"]];
+const BRK = [[50,0],[100,0],[150,0]];
+const STOP_KMH = 0.8, STOP_HOLD = 1.0; // dayanma: <0.8 km/saat, ≥1 s
+const ROLLOUT = 0.3048;
+
+// ================= Vəziyyət =================
+const S = {
+  src:null, hz:0, sats:null, hAcc:null, sAcc:null, batt:null, fused:false, calib:null,
+  samples:[], run:null, best:{}, vmax:0, lastG:0, history:[], lastRun:null, stopSince:null, moving:false
+};
+try{ S.history = JSON.parse(localStorage.getItem("gsa_hist")||"[]"); S.best = JSON.parse(localStorage.getItem("gsa_best")||"{}"); }catch(e){}
+const $ = id => document.getElementById(id);
+
+// ================= Analiz (saf funksiyalar) =================
+// s: [{t (s), v (m/s), d (m, kumulyativ), alt}]
+function crossUp(s, from, vKmh){ const v=vKmh/KMH;
+  for(let i=Math.max(1,from);i<s.length;i++){ if(s[i-1].v<v && s[i].v>=v){ return lerpT(s[i-1],s[i],v);} } return null; }
+function lerpT(a,b,v){ const f=(v-a.v)/((b.v-a.v)||1e-9); return {t:a.t+f*(b.t-a.t), d:a.d+f*(b.d-a.d), alt:lerp(a.alt,b.alt,f), i:a, f}; }
+function lerp(a,b,f){ return (a==null||b==null)?null:a+f*(b-a); }
+function atDist(s, dTarget){ for(let i=1;i<s.length;i++){ if(s[i-1].d<dTarget && s[i].d>=dTarget){
+  const f=(dTarget-s[i-1].d)/((s[i].d-s[i-1].d)||1e-9); return {t:s[i-1].t+f*(s[i].t-s[i-1].t), v:s[i-1].v+f*(s[i].v-s[i-1].v), alt:lerp(s[i-1].alt,s[i].alt,f)}; } } return null; }
+function idxAfter(s,t){ let i=0; while(i<s.length && s[i].t<t) i++; return i; }
+
+// Start anı (0 km/saat): akselerometrdən gələn dəqiq start və ya ilk iki hərəkət nöqtəsindən geri ekstrapolyasiya
+function launchTime(s, accelLaunch){
+  let i=s.findIndex(p=>p.v*KMH>STOP_KMH); if(i<0) return null;
+  let z=i-1; while(z>=0 && s[z].v>0.05) z--;           // həqiqətən dayanan son nöqtə
+  const lastZero = z>=0 ? s[z] : null;
+  let t0;
+  if(i+1<s.length && s[i+1].v>s[i].v){ const a=(s[i+1].v-s[i].v)/(s[i+1].t-s[i].t); t0=s[i].t - s[i].v/a; }
+  else t0 = s[i].t;
+  if(lastZero) t0=Math.max(t0,lastZero.t);
+  // telefon GPS-i 0.3–1 s gecikir: GPS "0" deyəndə maşın artıq gedə bilər, ona görə 1.5 s tolerans
+  if(accelLaunch!=null && (!lastZero || accelLaunch>=lastZero.t-1.5) && accelLaunch<=s[i].t) t0=accelLaunch;
+  return t0;
+}
+function distAt(s,t){ const i=idxAfter(s,t); if(i<=0) return 0; if(i>=s.length) return s[s.length-1].d;
+  const a=s[i-1],b=s[i],f=(t-a.t)/((b.t-a.t)||1e-9); return a.d+f*(b.d-a.d); }
+function altAt(s,t){ const i=Math.min(Math.max(idxAfter(s,t),1),s.length-1); const a=s[i-1],b=s[i]; return lerp(a.alt,b.alt,(t-a.t)/((b.t-a.t)||1e-9)); }
+
+function analyze(s, opt){
+  const R={acc:{},dist:{},brk:{},vmax:0,slope:null};
+  if(s.length<3) return R;
+  for(const p of s) if(p.v>R.vmax) R.vmax=p.v;
+  const t0 = launchTime(s, opt.accelLaunch);
+  const winList = ACC.concat(opt.custom?[opt.custom]:[]);
+  for(const [a,b] of winList){
+    if(b<=a) continue;
+    let start = null, si=0;
+    if(a===0){ if(t0==null) continue; start={t:t0,d:distAt(s,t0),alt:altAt(s,t0)}; si=idxAfter(s,t0); }
+    else { start=crossUp(s,1,a); if(!start) continue; si=idxAfter(s,start.t); }
+    const end=crossUp(s,Math.max(1,si),b); if(!end) continue;
+    // keyfiyyət: aralıqda sürət başlanğıcdan aşağı düşməməli
+    let ok=true; for(let k=si;k<s.length && s[k].t<end.t;k++){ if(s[k].v*KMH < a-2) {ok=false;break;} }
+    if(!ok) continue;
+    const dd=end.d-start.d, da=(end.alt!=null&&start.alt!=null)?end.alt-start.alt:null;
+    R.acc[a+"-"+b]={t:end.t-start.t, d:dd, slope: (da!=null&&dd>20)? da/dd*100 : null};
+  }
+  if(t0!=null){
+    const tStart = opt.rollout ? (atDist(s, distAt(s,t0)+ROLLOUT)||{t:t0}).t : t0;
+    const d0 = distAt(s,t0);
+    for(const [dm,label] of DIST){
+      const e=atDist(s,d0+dm); if(!e) continue;
+      R.dist[label]={t:e.t-tStart, trap:e.v*KMH};
+    }
+  }
+  // Əyləc: b km/saat-dən aşağı keçid → dayanma, arada sürət artmamalıdır
+  for(const [b] of BRK){
+    const v=b/KMH; let found=null;
+    for(let i=1;i<s.length;i++){
+      if(s[i-1].v>=v && s[i].v<v){
+        const f=(s[i-1].v-v)/((s[i-1].v-s[i].v)||1e-9);
+        const tc=s[i-1].t+f*(s[i].t-s[i-1].t), dc=s[i-1].d+f*(s[i].d-s[i-1].d);
+        let j=i, ok=true, peak=0;
+        while(j<s.length && s[j].v*KMH>STOP_KMH){ if(s[j].v>v+0.6){ok=false;break;} j++; }
+        if(!ok || j>=s.length) continue;
+        // 0 anını son iki nöqtədən ekstrapolyasiya et
+        // son "hərəkət" nöqtəsindən 0-a ekstrapolyasiya; yavaşlamanı əvvəlki cütdən götür (dayanma nümunəsi gecikmiş ola bilər)
+        const p=s[j-1], q=s[j], o=j>=2?s[j-2]:null; let tz=q.t, dz=q.d;
+        const dec = (o && o.v>p.v) ? (o.v-p.v)/(p.t-o.t) : (p.v>q.v ? (p.v-q.v)/(q.t-p.t) : 0);
+        if(dec>0){ tz=p.t+p.v/dec; dz=p.d+p.v*p.v/(2*dec); if(tz>q.t){tz=q.t;dz=q.d;} }
+        for(let k=i;k<=j;k++){ const dvdt=(s[k-1].v-s[k].v)/((s[k].t-s[k-1].t)||1e-9); if(dvdt>peak) peak=dvdt; }
+        const T=tz-tc; found={t:T, d:dz-dc, g:v/T/G, peak:peak/G};
+      }
+    }
+    if(found) R.brk[b+"-0"]=found;
+  }
+  if(R.acc["0-100"] && R.acc["0-100"].slope!=null) R.slope=R.acc["0-100"].slope;
+  return R;
+}
+
+// ================= Nümunə emalı =================
+function pushSample(t, v, alt){
+  if(!isFinite(t)||!isFinite(v)) return;
+  v=Math.max(0,v);
+  const prev=S.samples[S.samples.length-1];
+  if(prev && t<=prev.t) return;
+  // Ağlabatanlıq süzgəci: >430 km/saat və ya >2.5 g sıçrayış — GPS xətası, at (ardıcıl 3-dən çox olsa qəbul et)
+  if(v>120 || (prev && t-prev.t<3 && Math.abs(v-prev.v)/(t-prev.t)>2.5*G && (S.rej||0)<3)){ S.rej=(S.rej||0)+1; return; }
+  S.rej=0;
+  const d = prev ? prev.d + (prev.v+v)/2*(t-prev.t) : 0;
+  const p={t,v,d,alt:(alt==null||!isFinite(alt))?null:alt};
+  S.samples.push(p);
+  if(S.samples.length>6000) S.samples.splice(0,1000);
+  if(prev){ const dt=t-prev.t; if(dt>0 && dt<2){ S.hz = S.hz? S.hz*0.9 + (1/dt)*0.1 : 1/dt; } if(!(S.src==="phone"&&M.g0) && dt>0) S.lastG=(v-prev.v)/dt/G; }
+  if(v>S.vmax) S.vmax=v;
+  runLogic(p);
+  // ölçmə gedərkən nəticələri canlı yenilə (saniyədə ~2 dəfə)
+  if(S.run && S.run.moved && (!S.liveT || t-S.liveT>0.5)){ S.liveT=t;
+    S.live={s:rebase(S.run.s)}; S.live.R=analyze(S.live.s,opts()); renderSlip(true); }
+}
+
+function runLogic(p){
+  const kmh=p.v*KMH;
+  if(kmh<STOP_KMH){
+    if(S.stopSince==null) S.stopSince=p.t;
+    if(S.run && S.run.moved && p.t-S.stopSince>=STOP_HOLD){ finishRun(); }
+    if(!S.run || !S.run.moved){
+      // hazır: run buferi dayanma nöqtələrinin son 1.5 s-ni saxlayır
+      if(!S.run) S.run={s:[],moved:false,accelLaunch:null};
+      S.run.s.push(p); while(S.run.s.length>2 && p.t-S.run.s[0].t>1.5) S.run.s.shift();
+      if(S.run.accelLaunch!=null && p.t-S.run.accelLaunch>3) S.run.accelLaunch=null; // köhnə, yalançı start
+    } else S.run.s.push(p);
+  } else {
+    S.stopSince=null;
+    if(!S.run) S.run={s:[],moved:true,accelLaunch:null};
+    S.run.moved=true; S.run.s.push(p);
+  }
+}
+function rebase(s){ const d0=s.length?s[0].d:0; return s.map(q=>({t:q.t,v:q.v,d:q.d-d0,alt:q.alt})); }
+function opts(){ const a=+$("cFrom").value, b=+$("cTo").value;
+  return {rollout:$("rollout").checked, custom:(b>a&&a>=0)?[a,b]:null, accelLaunch:S.run?S.run.accelLaunch:null}; }
+
+function finishRun(){
+  const r=S.run; S.run=null; S.live=null;
+  if(!r || r.s.length<4) return;
+  const s=rebase(r.s);
+  const R=analyze(s,{...opts(),accelLaunch:r.accelLaunch});
+  S.lastRun={s, R, src:S.src, hz:S.hz, fused:(S.src==="phone"&&!!M.g0), when:new Date().toISOString()};
+  // ən yaxşılar
+  const upd=(k,val,lower)=>{ if(val==null) return; if(S.best[k]==null || (lower? val<S.best[k] : val>S.best[k])) S.best[k]=val; };
+  for(const k in R.acc) upd("acc:"+k,R.acc[k].t,true);
+  for(const k in R.dist) upd("dist:"+k,R.dist[k].t,true);
+  for(const k in R.brk) upd("brk:"+k,R.brk[k].d,true);
+  upd("vmax",R.vmax*KMH,false);
+  const sum=[];
+  if(R.acc["0-100"]) sum.push("0–100: "+R.acc["0-100"].t.toFixed(2)+" s");
+  if(R.brk["100-0"]) sum.push("100–0: "+R.brk["100-0"].d.toFixed(1)+" m");
+  sum.push("maks "+Math.round(R.vmax*KMH)+" km/saat");
+  S.history.unshift({when:S.lastRun.when, src:srcName(S.src), hz:Math.round(S.hz), txt:sum.join(" · ")});
+  S.history=S.history.slice(0,30);
+  try{ localStorage.setItem("gsa_hist",JSON.stringify(S.history)); localStorage.setItem("gsa_best",JSON.stringify(S.best)); }catch(e){}
+  renderSlip(); renderHist(); drawChart();
+}
+
+// ================= UI =================
+function srcName(k){ return {phone:"Telefon GPS",racebox:"RaceBox",ubx:"ESP32+u-blox",demo:"Demo"}[k]||"—"; }
+function fmt(x,n){ return x==null? "—" : x.toFixed(n); }
+function renderLive(){
+  const p=S.samples[S.samples.length-1]; const kmh=p? p.v*KMH : 0;
+  $("spd").firstChild.nodeValue = kmh<10? kmh.toFixed(1) : Math.round(kmh);
+  $("vmax").textContent=Math.round(S.vmax*KMH);
+  $("glong").textContent=fmt(S.lastG,2);
+  const cur = S.run && S.run.s.length ? S.run.s[S.run.s.length-1].d - S.run.s[0].d : 0;
+  $("dist").textContent=Math.round(cur)+" m";
+  const g=Math.max(-1.2,Math.min(1.2,S.lastG)); const fill=$("gfill");
+  fill.style.width=Math.abs(g)/1.2*50+"%"; fill.style.left = g>=0? "50%" : (50-Math.abs(g)/1.2*50)+"%";
+  fill.style.background = g>=0? "var(--accent)" : "var(--bad)";
+  // vəziyyət
+  const st=$("state"), tx=$("stateTxt");
+  if(!S.src){ st.dataset.s="wait"; tx.textContent="Mənbə seçin"; }
+  else if(!p){ st.dataset.s="wait"; tx.textContent="Siqnal gözlənilir…"; }
+  else if(S.run && S.run.moved){ st.dataset.s="run"; tx.textContent="Ölçülür — dayanana qədər qeyd gedir"; }
+  else if(kmh<STOP_KMH){ st.dataset.s="ready"; tx.textContent="Hazır — qaza basın, start avtomatik tutulacaq"; }
+  else { st.dataset.s="run"; tx.textContent="Hərəkətdə"; }
+  // keyfiyyət çipləri
+  const chips=[];
+  const hz=S.hz; const hzCls= hz>=18?"good": hz>=8?"warn":"bad";
+  chips.push(`<span class="chip ${S.samples.length?hzCls:""}">Tezlik <b>${S.samples.length?hz.toFixed(1):"—"} Hz</b></span>`);
+  if(S.satInfo){ const d=S.satInfo;
+    chips.push(`<span class="chip ${d.used>=10?"good":d.used>=6?"warn":"bad"}">Peyk <b>${d.used}/${d.total}</b></span>`);
+    const by=Object.entries(d.by||{}).map(([k,v])=>`${k} <b>${v}</b>`).join(" · ");
+    if(by) chips.push(`<span class="chip">${by}</span>`);
+    if(d.cn0) chips.push(`<span class="chip ${d.cn0>=35?"good":d.cn0>=28?"warn":"bad"}">Siqnal <b>${d.cn0} dB-Hz</b></span>`);
+  } else if(S.sats!=null) chips.push(`<span class="chip ${S.sats>=10?"good":S.sats>=6?"warn":"bad"}">Peyk <b>${S.sats}</b></span>`);
+  if(S.hAcc!=null) chips.push(`<span class="chip ${S.hAcc<=2?"good":S.hAcc<=6?"warn":"bad"}">Mövqe ± <b>${S.hAcc.toFixed(1)} m</b></span>`);
+  if(S.sAcc!=null) chips.push(`<span class="chip ${S.sAcc<=0.3?"good":S.sAcc<=0.8?"warn":"bad"}">Sürət ± <b>${(S.sAcc*KMH).toFixed(1)} km/saat</b></span>`);
+  if(S.src==="phone") chips.push(`<span class="chip ${M.g0?"good":"bad"}">Akselerometr <b>${M.g0?(M.gAuto?"avto-kalibr":"kalibrlənib"):"kalibrsiz"}</b></span>`);
+  if(S.batt!=null) chips.push(`<span class="chip">Batareya <b>${S.batt}%</b></span>`);
+  $("chips").innerHTML=chips.join("");
+}
+function renderSlip(live){
+  const L=live&&S.live? S.live.R : (S.lastRun?S.lastRun.R:null); const rows=[];
+  rows.push(`<tr><th>Pəncərə</th><th>Son</th><th>Ən yaxşı</th><th>Əlavə</th></tr>`);
+  rows.push(`<tr class="grp"><td colspan="4">Sürətlənmə</td></tr>`);
+  const acc=ACC.slice(); const c=opts().custom; if(c) acc.push(c);
+  for(const [a,b] of acc){ const k=a+"-"+b, r=L&&L.acc[k], best=S.best["acc:"+k];
+    const isBest = r && best!=null && Math.abs(r.t-best)<1e-6;
+    rows.push(`<tr><td>${a}–${b} km/saat</td><td class="${r?(isBest?"best":""):"na"}">${r?r.t.toFixed(2)+" s":"—"}</td><td>${best!=null?best.toFixed(2)+" s":"—"}</td><td>${r?Math.round(r.d)+" m":""}</td></tr>`); }
+  rows.push(`<tr class="grp"><td colspan="4">Məsafə</td></tr>`);
+  for(const [,label] of DIST){ const r=L&&L.dist[label], best=S.best["dist:"+label];
+    rows.push(`<tr><td>${label}</td><td class="${r?"":"na"}">${r?r.t.toFixed(2)+" s":"—"}</td><td>${best!=null?best.toFixed(2)+" s":"—"}</td><td>${r?Math.round(r.trap)+" km/saat":""}</td></tr>`); }
+  rows.push(`<tr class="grp"><td colspan="4">Əyləc (məsafə · vaxt · orta g)</td></tr>`);
+  for(const [b] of BRK){ const k=b+"-0", r=L&&L.brk[k], best=S.best["brk:"+k];
+    rows.push(`<tr><td>${b}–0 km/saat</td><td class="${r?"":"na"}">${r?r.d.toFixed(1)+" m":"—"}</td><td>${best!=null?best.toFixed(1)+" m":"—"}</td><td>${r?r.t.toFixed(2)+" s · "+r.g.toFixed(2)+" g":""}</td></tr>`); }
+  rows.push(`<tr class="grp"><td colspan="4">Maksimal sürət</td></tr>`);
+  rows.push(`<tr><td>V<sub>maks</sub></td><td>${L?Math.round(L.vmax*KMH)+" km/saat":"—"}</td><td>${S.best.vmax!=null?Math.round(S.best.vmax)+" km/saat":"—"}</td><td></td></tr>`);
+  $("slip").innerHTML=rows.join("");
+  let note="";
+  if(S.lastRun){
+    const q=S.lastRun; note=`Mənbə: <b>${srcName(q.src)}</b>, ${q.hz.toFixed(1)} Hz${q.fused?" + akselerometr":""}. `;
+    if(q.src==="phone") note+="Telefon GPS ilə nəticə təxminidir (±0.2–0.5 s). Dəqiq ölçmə üçün 10–25 Hz qəbuledici istifadə edin. ";
+    if(L&&L.slope!=null){ const sl=L.slope; note+=`0–100 hissəsində yamac: <b>${sl>0?"+":""}${sl.toFixed(1)}%</b>`+(Math.abs(sl)>2?" — enişli/yoxuşlu yol, nəticəni ədalətli hesab etməyin.":" — düz yol.");}
+  }
+  $("slope").innerHTML=note;
+}
+function renderHist(){
+  $("hist").innerHTML = S.history.length? S.history.map(h=>`<div><span>${h.txt}</span><em>${h.src} · ${h.hz} Hz · ${new Date(h.when).toLocaleString("az")}</em></div>`).join("")
+    : `<p class="note">Hələ ölçmə yoxdur. Dayanın → qaza basın → sonra tam dayanın: nəticə avtomatik yazılır.</p>`;
+}
+function drawChart(){
+  const cv=$("chart"), dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr; const c=cv.getContext("2d"); c.scale(dpr,dpr); c.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.documentElement);
+  const col=n=>cs.getPropertyValue(n).trim();
+  const s = S.lastRun? S.lastRun.s : (S.run? rebase(S.run.s):[]);
+  c.font="11px "+col("--f-data"); c.fillStyle=col("--muted");
+  if(s.length<2){ c.fillText("Ölçmədən sonra burada sürət əyrisi görünəcək",8,H/2); return; }
+  const t0=s[0].t, T=Math.max(1,s[s.length-1].t-t0);
+  let vm=0; for(const p of s) vm=Math.max(vm,p.v*KMH); const top=Math.max(60,Math.ceil(vm/20)*20);
+  const L=34,B=20,R=8,Tp=8, x=t=>L+(t-t0)/T*(W-L-R), y=v=>H-B-(v/top)*(H-B-Tp);
+  c.strokeStyle=col("--line"); c.lineWidth=1;
+  for(let v=0;v<=top;v+=top>160?40:20){ c.beginPath(); c.moveTo(L,y(v)); c.lineTo(W-R,y(v)); c.stroke(); c.fillText(v,4,y(v)+4); }
+  const step=T>60?10:T>20?5:T>8?2:1;
+  for(let t=0;t<=T;t+=step){ c.fillText(t+"s",x(t0+t)-6,H-5); }
+  c.beginPath(); s.forEach((p,i)=>{ const X=x(p.t),Y=y(p.v*KMH); i?c.lineTo(X,Y):c.moveTo(X,Y); });
+  c.strokeStyle=col("--accent"); c.lineWidth=2; c.stroke();
+  c.lineTo(x(s[s.length-1].t),y(0)); c.lineTo(x(t0),y(0)); c.closePath();
+  c.globalAlpha=.12; c.fillStyle=col("--accent"); c.fill(); c.globalAlpha=1;
+  // 100 km/saat xətti
+  if(top>=100){ c.setLineDash([4,4]); c.strokeStyle=col("--muted"); c.beginPath(); c.moveTo(L,y(100)); c.lineTo(W-R,y(100)); c.stroke(); c.setLineDash([]); }
+}
+let toastT; function toast(m){ let el=document.querySelector(".toast"); if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el);} el.textContent=m; el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>el.hidden=true,3500); }
+
+// ================= Mənbələr =================
+// Android tətbiqində (WebView) nativ körpü: peyklər + Bluetooth
+const NATIVE = (typeof window.ElmNative!=="undefined") ? window.ElmNative : null;
+window.elmNative = { onStatus:m=>toast(m), onError:m=>toast(m) };
+let stopFn=null;
+let gen=0;
+async function selectSource(k){
+  const my=++gen;
+  if(stopFn){ try{stopFn();}catch(e){} stopFn=null; }
+  S.src=k; S.samples=[]; S.run=null; S.hz=0; S.sats=S.hAcc=S.sAcc=S.batt=null; S.satInfo=null; S.fused=false; S.rej=0; S.stopSince=null; S.lastG=0;
+  document.querySelectorAll("#src button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.src===k?"true":"false"));
+  try{
+    if(k==="phone"){ const f=await startPhone(); if(my!==gen){f();return;} stopFn=f; }
+    else if(k==="racebox"||k==="ubx") stopFn=await startBLE(k);
+    else if(k==="demo") stopFn=startDemo();
+    wake();
+  }catch(e){ toast(e.message||String(e)); S.src=null; document.querySelectorAll("#src button").forEach(b=>b.setAttribute("aria-pressed","false")); }
+}
+
+// ---- Telefon: GPS + akselerometr ----
+// Prinsip: sürət YALNIZ GPS-dən gəlir (akselerometrlə inteqrasiya yoxdur — o, zamanla "qaçır").
+// Akselerometr: bütün 3 oxdan oxunur, kalibrlənmiş g vektoru çıxılır → xətti təcil vektoru;
+// şaquli hissə (yol çuxurları) atılır, qalan üfüqi təcilin modulu istifadə olunur.
+// İşarə (+ sürətlənmə / − əyləc) GPS sürətinin dəyişməsindən götürülür.
+// İstifadə: start anının dəqiq tutulması və canlı g göstəricisi.
+const M={g0:null, gAuto:false, hist:[], lastFix:null, off:null, sign:1, aS:0, launchArm:0, stillSince:null};
+async function askMotion(){
+  if(typeof DeviceMotionEvent!=="undefined" && typeof DeviceMotionEvent.requestPermission==="function"){
+    try{ return (await DeviceMotionEvent.requestPermission())==="granted"; }catch(e){ return false; }
+  } return true;
+}
+async function startPhone(){
+  if(!NATIVE && !("geolocation" in navigator)) throw new Error("Bu brauzerdə GPS yoxdur.");
+  await askMotion(); // iPhone-da toxunuş tələb edir; alınmasa "Kalibrlə" düyməsi yenidən soruşur
+  M.lastFix=null; M.off=null; M.sign=1; M.aS=0;
+  const onMotion=ev=>motion(ev);
+  window.addEventListener("devicemotion",onMotion);
+  let stopGeo;
+  if(NATIVE){
+    elmNative.onFix=f=>onFix({timestamp:f.t, coords:{latitude:f.lat, longitude:f.lon, speed:f.spd>=0?f.spd:null,
+      accuracy:f.acc>=0?f.acc:null, altitude:f.alt==null?null:f.alt, speedAccuracy:f.sacc>=0?f.sacc:null}});
+    elmNative.onSats=d=>{ S.satInfo=d; S.sats=d.used; renderLive(); };
+    NATIVE.startGnss();
+    stopGeo=()=>{ NATIVE.stopGnss(); elmNative.onFix=elmNative.onSats=null; };
+  } else {
+    const id=navigator.geolocation.watchPosition(onFix, err=>{ const blocked=/permission|policy|denied/i.test(err.message)||err.code===1; toast(blocked?"GPS icazəsi yoxdur. Səhifəni Safari/Chrome-da HTTPS ünvandan açın və yer (location) icazəsi verin.":"GPS xətası: "+err.message); }, {enableHighAccuracy:true, maximumAge:0, timeout:15000});
+    stopGeo=()=>navigator.geolocation.clearWatch(id);
+  }
+  return ()=>{ stopGeo(); window.removeEventListener("devicemotion",onMotion); };
+}
+function hav(a,b){ const R=6371000,toR=Math.PI/180, dLa=(b.lat-a.lat)*toR, dLo=(b.lon-a.lon)*toR;
+  const h=Math.sin(dLa/2)**2+Math.cos(a.lat*toR)*Math.cos(b.lat*toR)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function onFix(pos){
+  const c=pos.coords, tg=pos.timestamp/1000, now=Date.now()/1000;
+  // Vahid zaman bazası: GPS epoxası + ən kiçik çatdırılma gecikməsi (telefon saatı ilə GPS saatı fərqli ola bilər)
+  const L=now-tg; M.off = (M.off==null || L<M.off) ? L : M.off + (L-M.off)*0.02;
+  const t=tg+M.off;
+  let v=c.speed;
+  if(v==null||!isFinite(v)){
+    // sürət sahəsi yoxdursa koordinatdan hesabla — yalnız kifayət qədər uzun aralıqda
+    if(!M.lastFix) { M.lastFix={t,lat:c.latitude,lon:c.longitude,v:0}; return; }
+    const dt=t-M.lastFix.t; if(dt<0.5) return;
+    v=hav(M.lastFix,{lat:c.latitude,lon:c.longitude})/dt;
+  }
+  S.hAcc=c.accuracy; S.sAcc=(c.speedAccuracy==null)?null:c.speedAccuracy;
+  if(M.lastFix){ const dt=t-M.lastFix.t; if(dt>0.2&&dt<3){ const a=(v-M.lastFix.v)/dt; if(a>0.3) M.sign=1; else if(a<-0.3) M.sign=-1; } }
+  if(v<1) M.sign=1; // dayanmış maşın əyləc edə bilməz — istənilən təcil irəlidir
+  M.lastFix={t,lat:c.latitude,lon:c.longitude,v};
+  pushSample(t,v,c.altitude);
+  renderLive();
+}
+function motion(ev){
+  const a=ev.accelerationIncludingGravity; if(!a||a.x==null) return;
+  const now=Date.now()/1000, v=[a.x,a.y,a.z];
+  M.hist.push({t:now,v}); while(M.hist.length && now-M.hist[0].t>2) M.hist.shift();
+  autoCalib(now);
+  if(!M.g0) return;
+  // 1) bütün oxlar: xətti təcil = ölçülən − g
+  const lin=[v[0]-M.g0[0],v[1]-M.g0[1],v[2]-M.g0[2]];
+  // 2) şaquli hissəni at (yol çuxuru, amortizator) — g istiqamətinə proyeksiya
+  const gn=Math.hypot(...M.g0), gu=M.g0.map(x=>x/gn), dz=lin[0]*gu[0]+lin[1]*gu[1]+lin[2]*gu[2];
+  let mag=Math.hypot(lin[0]-dz*gu[0],lin[1]-dz*gu[1],lin[2]-dz*gu[2]);
+  if(mag<0.03*G) mag=0;                 // sensor küyü üçün ölü zona
+  M.aS = M.aS*0.85 + mag*0.15;          // ~100 ms hamarlama
+  S.lastG = M.sign*M.aS/G;
+  // 3) start anı: dayanarkən üfüqi təcil >0.10 g, 80 ms davam edir
+  if(S.run && !S.run.moved){
+    if(mag>0.10*G){ M.launchArm=M.launchArm||now; if(now-M.launchArm>0.08 && S.run.accelLaunch==null) S.run.accelLaunch=M.launchArm-0.02; }
+    else M.launchArm=0;
+  }
+}
+// Avto-kalibrləmə: GPS dayanma göstərir və telefon 1.5 s sakitdirsə, g vektorunu yenilə
+function autoCalib(now){
+  const lastV = S.samples.length ? S.samples[S.samples.length-1].v : null;
+  const stopped = lastV!=null && lastV*KMH<0.8 && S.stopSince!=null;
+  const w=M.hist.filter(p=>now-p.t<1.5); if(w.length<20){ return; }
+  const m=[0,0,0]; w.forEach(p=>{m[0]+=p.v[0];m[1]+=p.v[1];m[2]+=p.v[2];}); m.forEach((x,i)=>m[i]=x/w.length);
+  let sd=0; w.forEach(p=>sd+=Math.hypot(p.v[0]-m[0],p.v[1]-m[1],p.v[2]-m[2])); sd/=w.length;
+  if(sd<0.12 && (stopped || !M.g0) && Math.abs(Math.hypot(...m)-G)<0.6){
+    if(!M.stillSince) M.stillSince=now;
+    if(now-M.stillSince>1.5 && !(S.run && S.run.moved)){
+      const first=!M.g0; M.g0=m; if(first){ M.gAuto=true; S.calib=true; renderLive(); }
+    }
+  } else M.stillSince=null;
+}
+async function calibrate(){
+  if(S.src!=="phone"){ toast("Əvvəlcə 'Telefon GPS' mənbəyini seçin."); return; }
+  if(!M.hist.length){
+    const ok=await askMotion();
+    toast(ok?"Akselerometr məlumatı gözlənilir — bir saniyə sonra yenidən basın.":"Hərəkət sensoruna icazə verilmədi.");
+    return;
+  }
+  const now=Date.now()/1000, w=M.hist.filter(p=>now-p.t<1.5);
+  const m=[0,0,0]; w.forEach(p=>{m[0]+=p.v[0];m[1]+=p.v[1];m[2]+=p.v[2];}); m.forEach((x,i)=>m[i]=x/w.length);
+  let sd=0; w.forEach(p=>sd+=Math.hypot(p.v[0]-m[0],p.v[1]-m[1],p.v[2]-m[2])); sd/=w.length;
+  if(sd>0.35){ toast("Telefon tərpənir — maşın dayanarkən, telefon bərkidilmiş halda təkrarlayın."); return; }
+  M.g0=m; M.gAuto=false; S.calib=true;
+  toast("Kalibrləndi: g = "+Math.hypot(...m).toFixed(2)+" m/s²"); renderLive();
+}
+
+// ---- BLE: RaceBox Mini (0xFF 0x01) və u-blox NAV-PVT (0x01 0x07), Nordic UART servisi ----
+const NUS="6e400001-b5a3-f393-e0a9-e50e24dcca9e", NUS_TX="6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+async function startBLE(kind){
+  towPrev=null; towOff=0;
+  if(NATIVE){
+    const parser=ubxStream(onUbx);
+    elmNative.onBle=b64=>{ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); parser(u); };
+    elmNative.onBleDisconnected=()=>{ if(S.src===kind) toast("Cihazla əlaqə kəsildi."); };
+    NATIVE.startBle(kind);
+    return ()=>{ NATIVE.stopBle(); elmNative.onBle=null; };
+  }
+  if(!navigator.bluetooth) throw new Error("Web Bluetooth yoxdur: Android Chrome lazımdır (iPhone Safari dəstəkləmir).");
+  const filters = kind==="racebox" ? [{namePrefix:"RaceBox"}] : [{namePrefix:"ElmGPS"},{services:[NUS]}];
+  const dev = await navigator.bluetooth.requestDevice({filters, optionalServices:[NUS]});
+  const srv = await dev.gatt.connect();
+  const ch = await (await srv.getPrimaryService(NUS)).getCharacteristic(NUS_TX);
+  const parser = ubxStream(onUbx);
+  const h = e=>parser(new Uint8Array(e.target.value.buffer, e.target.value.byteOffset, e.target.value.byteLength));
+  ch.addEventListener("characteristicvaluechanged",h); await ch.startNotifications();
+  dev.addEventListener("gattserverdisconnected",()=>{ if(S.src===kind){ toast("Cihazla əlaqə kəsildi."); } });
+  toast("Qoşuldu: "+(dev.name||"cihaz"));
+  return ()=>{ try{ch.removeEventListener("characteristicvaluechanged",h); dev.gatt.disconnect();}catch(e){} };
+}
+function ubxStream(cb){
+  let buf=new Uint8Array(0);
+  return chunk=>{
+    const n=new Uint8Array(buf.length+chunk.length); n.set(buf); n.set(chunk,buf.length); buf=n;
+    for(;;){
+      let i=0; while(i+1<buf.length && !(buf[i]===0xB5&&buf[i+1]===0x62)) i++;
+      if(i) buf=buf.slice(i);
+      if(buf.length<8) return;
+      const len=buf[4]|(buf[5]<<8), tot=len+8;
+      if(len>512){ buf=buf.slice(2); continue; }
+      if(buf.length<tot) return;
+      let a=0,b=0; for(let k=2;k<6+len;k++){ a=(a+buf[k])&255; b=(b+a)&255; }
+      if(a===buf[6+len] && b===buf[7+len]) cb(buf[2],buf[3],new DataView(buf.buffer,buf.byteOffset+6,len));
+      buf=buf.slice(a===buf[6+len]&&b===buf[7+len]?tot:2);
+    }
+  };
+}
+let towPrev=null, towOff=0;
+function onUbx(cls,id,dv){
+  let iTOW,fix,sv,v,msl,hAcc,sAcc,batt=null,gx=null;
+  if(cls===0xFF && id===0x01 && dv.byteLength>=80){ // RaceBox Data Message
+    iTOW=dv.getUint32(0,true); fix=dv.getUint8(20); sv=dv.getUint8(23); msl=dv.getInt32(36,true)/1000;
+    hAcc=dv.getUint32(40,true)/1000; v=dv.getInt32(48,true)/1000; sAcc=dv.getUint32(56,true)/1000;
+    batt=dv.getUint8(67)&0x7F; gx=dv.getInt16(68,true)/1000;
+  } else if(cls===0x01 && id===0x07 && dv.byteLength>=92){ // UBX-NAV-PVT
+    iTOW=dv.getUint32(0,true); fix=dv.getUint8(20); sv=dv.getUint8(23); msl=dv.getInt32(36,true)/1000;
+    hAcc=dv.getUint32(40,true)/1000; v=dv.getInt32(60,true)/1000; sAcc=dv.getUint32(68,true)/1000;
+  } else return;
+  S.sats=sv; S.hAcc=hAcc; S.sAcc=sAcc; if(batt!=null) S.batt=batt;
+  if(fix<3){ renderLive(); return; }            // 3D fix olmadan ölçmə yoxdur
+  if(towPrev!=null && iTOW<towPrev-300000) towOff+=604800; towPrev=iTOW; // həftə keçidi
+  pushSample(iTOW/1000+towOff, v, msl);
+  if(gx!=null) S.lastG=gx; // RaceBox öz akselerometri (cihaz oxu X, istiqamət montajdan asılıdır)
+  renderLive();
+}
+
+// ---- Demo: 25 Hz sintetik ölçmə (0→~170 km/saat, sonra 1.0 g əyləc) ----
+function startDemo(){
+  let t=0, v=0, phase=0, hold=0, timer;
+  const step=()=>{ if(S.src!=="demo"){ clearInterval(timer); return; } const dt=0.04; t+=dt;
+    if(phase===0){ hold+=dt; if(hold>2) phase=1; }
+    else if(phase===1){ const a=Math.max(0.8, 6.2 - v*0.085 - v*v*0.0009); v+=a*dt; if(v*KMH>172) {phase=2;hold=0;} }
+    else if(phase===2){ hold+=dt; if(hold>1.2) phase=3; }
+    else if(phase===3){ v-=1.0*G*dt; if(v<=0){ v=0; phase=4; hold=0; } }
+    else { hold+=dt; if(hold>3){ phase=0; hold=0; } }
+    const noise=(Math.random()-.5)*0.04;
+    S.sats=18; S.hAcc=0.5; S.sAcc=0.12;
+    pushSample(t, Math.max(0,v+(v>0?noise:0)), 10+0.004*(S.samples.length?S.samples[S.samples.length-1].d:0));
+    renderLive();
+  };
+  timer=setInterval(step,40);
+  return ()=>clearInterval(timer);
+}
+
+// ================= Köməkçilər =================
+let wl=null; async function wake(){ try{ if("wakeLock" in navigator && !wl){ wl=await navigator.wakeLock.request("screen"); wl.addEventListener("release",()=>wl=null);} }catch(e){} }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible" && S.src) wake(); });
+function csv(){
+  const s = S.lastRun? S.lastRun.s : null; if(!s){ toast("Hələ tamamlanmış ölçmə yoxdur."); return; }
+  const lines=["t_s,speed_kmh,dist_m,alt_m"].concat(s.map(p=>[(p.t-s[0].t).toFixed(3),(p.v*KMH).toFixed(2),p.d.toFixed(2),p.alt==null?"":p.alt.toFixed(2)].join(",")));
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"}); const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="olcme-"+S.lastRun.when.replace(/[:.]/g,"-")+".csv"; document.body.appendChild(a); a.click(); a.remove();
+}
+$("src").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) selectSource(b.dataset.src); });
+$("calBtn").onclick=calibrate;
+$("zeroBtn").onclick=()=>{ S.vmax=0; S.run=null; S.live=null; S.lastRun=null; S.stopSince=null; S.lastG=0;
+  const last=S.samples[S.samples.length-1]; S.samples= last? [last] : [];
+  renderLive(); renderSlip(); drawChart(); toast("Cari göstəricilər sıfırlandı."); }; $("csvBtn").onclick=csv;
+$("resetBtn").onclick=()=>{ S.best={}; S.history=[]; S.lastRun=null; S.vmax=0; try{localStorage.removeItem("gsa_best");localStorage.removeItem("gsa_hist");}catch(e){} renderSlip(); renderHist(); drawChart(); toast("Tarixçə və rekordlar silindi."); };
+["rollout","cFrom","cTo"].forEach(id=>$(id).addEventListener("change",()=>{ if(S.lastRun){ S.lastRun.R=analyze(S.lastRun.s,{...opts(),accelLaunch:null}); } renderSlip(); }));
+$("themeBtn").onclick=()=>{ const r=document.documentElement, cur=r.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
+  r.dataset.theme = cur==="dark"?"light":"dark"; try{localStorage.setItem("gsa_theme",r.dataset.theme);}catch(e){} drawChart(); };
+try{ const th=localStorage.getItem("gsa_theme"); if(th) document.documentElement.dataset.theme=th; }catch(e){}
+window.addEventListener("resize",drawChart);
+setInterval(()=>{ if(S.run && S.run.moved && S.lastRun==null) drawChart(); },1000);
+if(NATIVE){ const b=document.querySelector('[data-src="phone"] small'); if(b) b.textContent="nativ GNSS + peyklər"; }
+renderSlip(); renderHist(); renderLive(); drawChart();
+selectSource("phone");
+if(typeof module!=="undefined") module.exports={analyze,ubxStream};
+</script>
+</body>
+</html>
